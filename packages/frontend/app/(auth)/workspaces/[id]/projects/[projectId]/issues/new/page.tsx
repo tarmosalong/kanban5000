@@ -12,10 +12,10 @@ interface IssueStatus {
 }
 
 const PRIORITIES = [
-  { value: 'low', label: 'Low', color: 'bg-gray-500' },
-  { value: 'medium', label: 'Medium', color: 'bg-blue-500' },
-  { value: 'high', label: 'High', color: 'bg-orange-500' },
-  { value: 'urgent', label: 'Urgent', color: 'bg-red-500' },
+  { value: 'low', label: 'Low', color: '#6b7280' },
+  { value: 'medium', label: 'Medium', color: '#3b82f6' },
+  { value: 'high', label: 'High', color: '#f59e0b' },
+  { value: 'urgent', label: 'Urgent', color: '#ef4444' },
 ];
 
 export default function NewIssuePage() {
@@ -85,9 +85,9 @@ export default function NewIssuePage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-8">Create Issue</h1>
+      <h1 className="text-3xl font-bold text-white mb-8">Create Issue</h1>
 
-      <Card className="p-6">
+      <Card className="p-6 bg-surface-card border-white/[0.06]">
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <div className="p-3 bg-red-500/10 border border-red-500/30 rounded text-red-400 text-sm">
@@ -96,7 +96,7 @@ export default function NewIssuePage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-2">Title</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">Title</label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -106,28 +106,28 @@ export default function NewIssuePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Description
             </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Add more details about this issue..."
-              className="w-full px-4 py-2 bg-surface-secondary border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none font-mono text-sm"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-transparent resize-none font-mono text-sm"
               rows={8}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Status</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
               <select
                 value={statusId}
                 onChange={(e) => setStatusId(e.target.value)}
-                className="w-full px-4 py-2 bg-surface-secondary border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               >
                 {statuses.map((status) => (
-                  <option key={status.id} value={status.id}>
+                  <option key={status.id} value={status.id} className="bg-surface text-white">
                     {status.name}
                   </option>
                 ))}
@@ -135,14 +135,14 @@ export default function NewIssuePage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-2">Priority</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Priority</label>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="w-full px-4 py-2 bg-surface-secondary border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50"
               >
                 {PRIORITIES.map((p) => (
-                  <option key={p.value} value={p.value}>
+                  <option key={p.value} value={p.value} className="bg-surface text-white">
                     {p.label}
                   </option>
                 ))}
@@ -167,4 +167,3 @@ export default function NewIssuePage() {
     </div>
   );
 }
-

@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
   KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
+  rectIntersection,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
+  type CollisionDetection,
+  pointerWithin,
+  getFirstCollision,
 } from '@dnd-kit/core';
 import {
   SortableContext,
@@ -90,6 +93,9 @@ export function KanbanBoard({
     return grouped;
   }, [localIssues, statuses]);
 
+  // All status IDs for collision detection
+  const statusIds = useMemo(() => statuses.map(s => s.id), [statuses]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -98,6 +104,27 @@ export function KanbanBoard({
     }),
     useSensor(KeyboardSensor)
   );
+
+  // Custom collision detection that prioritizes columns for empty drops
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    // First check for pointer within droppable areas (columns)
+    const pointerCollisions = pointerWithin(args);
+    
+    // If pointer is within a column, use that
+    const columnCollision = pointerCollisions.find(c => statusIds.includes(c.id as string));
+    if (columnCollision) {
+      return [columnCollision];
+    }
+    
+    // Fall back to rect intersection for items
+    const rectCollisions = rectIntersection(args);
+    if (rectCollisions.length > 0) {
+      return rectCollisions;
+    }
+    
+    // If no collision, return pointer collisions
+    return pointerCollisions;
+  }, [statusIds]);
 
   function handleDragStart(event: DragStartEvent) {
     const { active } = event;
@@ -184,7 +211,7 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -213,7 +240,7 @@ export function KanbanBoard({
                 </KanbanCard>
               ))}
               {issuesByStatus[status.id]?.length === 0 && (
-                <div className="flex items-center justify-center h-20 text-xs text-slate-600 border border-dashed border-white/[0.06] rounded-lg">
+                <div className="flex items-center justify-center h-24 text-xs text-slate-500 border border-dashed border-white/10 rounded-lg bg-white/[0.02]">
                   Drop issues here
                 </div>
               )}
