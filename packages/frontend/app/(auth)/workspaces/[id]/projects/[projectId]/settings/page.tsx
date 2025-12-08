@@ -1,8 +1,25 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button, Card, Input } from '@/components/ui';
 
 interface Status {
@@ -21,14 +38,131 @@ interface Label {
   description: string | null;
 }
 
-const DEFAULT_COLORS = [
-  '#6b7280', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', 
-  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4'
-];
+// Sortable Status Item Component
+function SortableStatusItem({
+  status,
+  isEditing,
+  editingStatus,
+  setEditingStatus,
+  onEdit,
+  onSave,
+  onCancel,
+  onDelete,
+}: {
+  status: Status;
+  isEditing: boolean;
+  editingStatus: Status | null;
+  setEditingStatus: (status: Status | null) => void;
+  onEdit: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: status.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <Card className={`p-3 ${isDragging ? 'ring-2 ring-primary-500' : ''}`}>
+        {isEditing && editingStatus ? (
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={editingStatus.color}
+              onChange={(e) =>
+                setEditingStatus({ ...editingStatus, color: e.target.value })
+              }
+              className="w-8 h-8 rounded cursor-pointer bg-transparent"
+            />
+            <Input
+              value={editingStatus.name}
+              onChange={(e) =>
+                setEditingStatus({ ...editingStatus, name: e.target.value })
+              }
+              className="flex-1"
+            />
+            <label className="flex items-center gap-2 text-sm text-slate-400">
+              <input
+                type="checkbox"
+                checked={editingStatus.isClosed}
+                onChange={(e) =>
+                  setEditingStatus({ ...editingStatus, isClosed: e.target.checked })
+                }
+                className="rounded"
+              />
+              Closed
+            </label>
+            <Button variant="primary" onClick={onSave}>
+              Save
+            </Button>
+            <Button variant="secondary" onClick={onCancel}>
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            {/* Drag handle */}
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing text-slate-500 hover:text-white p-1 -ml-1"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+            </button>
+            <div
+              className="w-4 h-4 rounded-full flex-shrink-0"
+              style={{ backgroundColor: status.color }}
+            />
+            <span className="flex-1 font-medium">{status.name}</span>
+            {status.isDefault && (
+              <span className="text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded">
+                Default
+              </span>
+            )}
+            {status.isClosed && (
+              <span className="text-xs bg-slate-500/20 text-slate-400 px-2 py-0.5 rounded">
+                Closed
+              </span>
+            )}
+            <button
+              onClick={onEdit}
+              className="text-slate-400 hover:text-white p-1"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-slate-400 hover:text-red-400 p-1"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
 
 export default function ProjectSettingsPage() {
   const params = useParams();
-  const router = useRouter();
   const workspaceId = params.id as string;
   const projectId = params.projectId as string;
 
@@ -50,7 +184,14 @@ export default function ProjectSettingsPage() {
 
   // Editing
   const [editingStatus, setEditingStatus] = useState<Status | null>(null);
-  const [editingLabel, setEditingLabel] = useState<Label | null>(null);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     loadData();
@@ -66,7 +207,7 @@ export default function ProjectSettingsPage() {
 
       if (statusRes.ok) {
         const data = await statusRes.json();
-        setStatuses(data.data || []);
+        setStatuses((data.data || []).sort((a: Status, b: Status) => a.position - b.position));
       }
       if (labelRes.ok) {
         const data = await labelRes.json();
@@ -76,6 +217,32 @@ export default function ProjectSettingsPage() {
       console.error('Failed to load settings:', err);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = statuses.findIndex((s) => s.id === active.id);
+      const newIndex = statuses.findIndex((s) => s.id === over.id);
+
+      const newStatuses = arrayMove(statuses, oldIndex, newIndex);
+      setStatuses(newStatuses);
+
+      // Save new order to backend
+      try {
+        await fetch(`/api/projects/${projectId}/statuses/order`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            statusIds: newStatuses.map((s) => s.id),
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to reorder statuses:', err);
+        loadData(); // Reload on error
+      }
     }
   }
 
@@ -239,92 +406,36 @@ export default function ProjectSettingsPage() {
       {activeTab === 'statuses' && (
         <div className="space-y-4">
           <p className="text-sm text-slate-400 mb-4">
-            Manage the columns on your Kanban board. Drag to reorder (coming soon).
+            Manage the columns on your Kanban board. Drag to reorder.
           </p>
 
-          {/* Existing statuses */}
-          <div className="space-y-2">
-            {statuses.map((status) => (
-              <Card key={status.id} className="p-3">
-                {editingStatus?.id === status.id ? (
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={editingStatus.color}
-                      onChange={(e) =>
-                        setEditingStatus({ ...editingStatus, color: e.target.value })
-                      }
-                      className="w-8 h-8 rounded cursor-pointer bg-transparent"
-                    />
-                    <Input
-                      value={editingStatus.name}
-                      onChange={(e) =>
-                        setEditingStatus({ ...editingStatus, name: e.target.value })
-                      }
-                      className="flex-1"
-                    />
-                    <label className="flex items-center gap-2 text-sm text-slate-400">
-                      <input
-                        type="checkbox"
-                        checked={editingStatus.isClosed}
-                        onChange={(e) =>
-                          setEditingStatus({ ...editingStatus, isClosed: e.target.checked })
-                        }
-                        className="rounded"
-                      />
-                      Closed
-                    </label>
-                    <Button
-                      variant="primary"
-                      onClick={() => handleUpdateStatus(editingStatus)}
-                    >
-                      Save
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      onClick={() => setEditingStatus(null)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-4 h-4 rounded-full"
-                      style={{ backgroundColor: status.color }}
-                    />
-                    <span className="flex-1 font-medium">{status.name}</span>
-                    {status.isDefault && (
-                      <span className="text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded">
-                        Default
-                      </span>
-                    )}
-                    {status.isClosed && (
-                      <span className="text-xs bg-slate-500/20 text-slate-400 px-2 py-0.5 rounded">
-                        Closed
-                      </span>
-                    )}
-                    <button
-                      onClick={() => setEditingStatus(status)}
-                      className="text-slate-400 hover:text-white p-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteStatus(status.id)}
-                      className="text-slate-400 hover:text-red-400 p-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
+          {/* Existing statuses with drag and drop */}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={statuses.map((s) => s.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {statuses.map((status) => (
+                  <SortableStatusItem
+                    key={status.id}
+                    status={status}
+                    isEditing={editingStatus?.id === status.id}
+                    editingStatus={editingStatus}
+                    setEditingStatus={setEditingStatus}
+                    onEdit={() => setEditingStatus(status)}
+                    onSave={() => editingStatus && handleUpdateStatus(editingStatus)}
+                    onCancel={() => setEditingStatus(null)}
+                    onDelete={() => handleDeleteStatus(status.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
 
           {/* Add new status */}
           <Card className="p-4 mt-4">
@@ -423,4 +534,3 @@ export default function ProjectSettingsPage() {
     </div>
   );
 }
-

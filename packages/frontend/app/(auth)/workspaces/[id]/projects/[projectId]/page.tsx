@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui';
@@ -15,6 +15,25 @@ interface Project {
   color: string;
 }
 
+interface Label {
+  id: string;
+  name: string;
+  color: string;
+}
+
+interface Filters {
+  priority: string | null;
+  assigneeId: string | null;
+  labelId: string | null;
+}
+
+const PRIORITY_OPTIONS = [
+  { value: 'urgent', label: 'Urgent', color: '#ef4444' },
+  { value: 'high', label: 'High', color: '#f59e0b' },
+  { value: 'medium', label: 'Medium', color: '#3b82f6' },
+  { value: 'low', label: 'Low', color: '#6b7280' },
+];
+
 export default function ProjectPage() {
   const params = useParams();
   const workspaceId = params.id as string;
@@ -23,15 +42,25 @@ export default function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [statuses, setStatuses] = useState<IssueStatus[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [labels, setLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filters
+  const [filters, setFilters] = useState<Filters>({
+    priority: null,
+    assigneeId: null,
+    labelId: null,
+  });
+  const [showFilters, setShowFilters] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [projectRes, statusesRes, issuesRes] = await Promise.all([
+      const [projectRes, statusesRes, issuesRes, labelsRes] = await Promise.all([
         fetch(`/api/projects/${projectId}`),
         fetch(`/api/projects/${projectId}/statuses`),
         fetch(`/api/projects/${projectId}/issues?includeClosed=true`),
+        fetch(`/api/projects/${projectId}/labels`),
       ]);
 
       if (!projectRes.ok) throw new Error('Failed to load project');
@@ -39,6 +68,7 @@ export default function ProjectPage() {
       const projectData = await projectRes.json();
       const statusesData = await statusesRes.json();
       const issuesData = await issuesRes.json();
+      const labelsData = await labelsRes.json();
 
       setProject(projectData.data);
       setStatuses(
@@ -48,6 +78,7 @@ export default function ProjectPage() {
         }))
       );
       setIssues(issuesData.data || []);
+      setLabels(labelsData.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -75,6 +106,40 @@ export default function ProjectPage() {
     },
     [fetchData]
   );
+
+  // Get unique assignees from issues
+  const assignees = useMemo(() => {
+    const uniqueAssignees = new Map<string, { id: string; name: string; email: string; image?: string }>();
+    issues.forEach((issue) => {
+      if (issue.assignee) {
+        uniqueAssignees.set(issue.assignee.id, issue.assignee);
+      }
+    });
+    return Array.from(uniqueAssignees.values());
+  }, [issues]);
+
+  // Filter issues
+  const filteredIssues = useMemo(() => {
+    return issues.filter((issue) => {
+      if (filters.priority && issue.priority !== filters.priority) {
+        return false;
+      }
+      if (filters.assigneeId && issue.assignee?.id !== filters.assigneeId) {
+        return false;
+      }
+      if (filters.labelId && !issue.labels.includes(filters.labelId)) {
+        return false;
+      }
+      return true;
+    });
+  }, [issues, filters]);
+
+  // Check if any filters are active
+  const hasActiveFilters = filters.priority || filters.assigneeId || filters.labelId;
+
+  const clearFilters = () => {
+    setFilters({ priority: null, assigneeId: null, labelId: null });
+  };
 
   if (loading) {
     return (
@@ -137,11 +202,32 @@ export default function ProjectPage() {
             <div className="flex items-center gap-3 text-sm">
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-slate-400">{openIssues} open</span>
+                <span className="text-slate-400">
+                  {hasActiveFilters ? `${filteredIssues.filter(i => !i.status.name.toLowerCase().includes('done')).length} shown` : `${openIssues} open`}
+                </span>
               </div>
               <span className="text-slate-600">/</span>
-              <span className="text-slate-500">{totalIssues} total</span>
+              <span className="text-slate-500">{hasActiveFilters ? `${filteredIssues.length} filtered` : `${totalIssues} total`}</span>
             </div>
+            
+            {/* Filter toggle button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-2 rounded-lg transition-colors ${
+                showFilters || hasActiveFilters
+                  ? 'bg-primary-500/20 text-primary-400'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+              title="Filters"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {hasActiveFilters && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary-500 rounded-full" />
+              )}
+            </button>
+
             <Link
               href={`/workspaces/${workspaceId}/projects/${projectId}/settings`}
               className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
@@ -164,6 +250,104 @@ export default function ProjectPage() {
         </div>
       </div>
 
+      {/* Filter bar */}
+      {showFilters && (
+        <div className="flex-shrink-0 px-6 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+          <div className="flex items-center gap-4 flex-wrap">
+            {/* Priority filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Priority</span>
+              <div className="flex gap-1">
+                {PRIORITY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setFilters(f => ({ 
+                      ...f, 
+                      priority: f.priority === opt.value ? null : opt.value 
+                    }))}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${
+                      filters.priority === opt.value
+                        ? 'ring-2 ring-offset-1 ring-offset-surface'
+                        : 'opacity-60 hover:opacity-100'
+                    }`}
+                    style={{
+                      backgroundColor: `${opt.color}20`,
+                      color: opt.color,
+                      ...(filters.priority === opt.value ? { ringColor: opt.color } : {}),
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="h-4 w-px bg-white/10" />
+
+            {/* Assignee filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Assignee</span>
+              <select
+                value={filters.assigneeId || ''}
+                onChange={(e) => setFilters(f => ({ ...f, assigneeId: e.target.value || null }))}
+                className="px-2 py-1 text-xs bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                <option value="unassigned">Unassigned</option>
+                {assignees.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name || a.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="h-4 w-px bg-white/10" />
+
+            {/* Label filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Label</span>
+              <div className="flex gap-1 flex-wrap">
+                {labels.slice(0, 5).map((label) => (
+                  <button
+                    key={label.id}
+                    onClick={() => setFilters(f => ({
+                      ...f,
+                      labelId: f.labelId === label.id ? null : label.id
+                    }))}
+                    className={`px-2 py-0.5 text-xs font-medium rounded transition-all ${
+                      filters.labelId === label.id
+                        ? 'ring-2 ring-offset-1 ring-offset-surface'
+                        : 'opacity-60 hover:opacity-100'
+                    }`}
+                    style={{
+                      backgroundColor: `${label.color}20`,
+                      color: label.color,
+                      border: `1px solid ${label.color}40`,
+                    }}
+                  >
+                    {label.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Clear filters */}
+            {hasActiveFilters && (
+              <>
+                <div className="h-4 w-px bg-white/10" />
+                <button
+                  onClick={clearFilters}
+                  className="px-2 py-1 text-xs text-slate-400 hover:text-white transition-colors"
+                >
+                  Clear all
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Kanban Board - fills remaining space */}
       <div className="flex-1 overflow-hidden p-4">
         {issues.length === 0 ? (
@@ -181,12 +365,27 @@ export default function ProjectPage() {
               </Link>
             </div>
           </div>
+        ) : filteredIssues.length === 0 && hasActiveFilters ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-500/20 to-slate-600/10 flex items-center justify-center">
+                <span className="text-4xl">🔍</span>
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">No matching issues</h2>
+              <p className="text-slate-400 mb-6 max-w-sm">
+                Try adjusting your filters to see more issues
+              </p>
+              <Button variant="secondary" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="h-full overflow-x-auto">
             <div className="flex gap-3 h-full pb-2">
               <KanbanBoard
                 statuses={statuses}
-                issues={issues}
+                issues={filteredIssues}
                 workspaceId={workspaceId}
                 projectId={projectId}
                 onIssueMove={handleIssueMove}

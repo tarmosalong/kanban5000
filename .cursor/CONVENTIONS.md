@@ -157,7 +157,87 @@ Use Tailwind with consistent ordering:
 
 ```tsx
 // Layout → Spacing → Sizing → Typography → Colors → Effects
-<div className="flex items-center gap-4 p-4 w-full text-sm text-gray-700 bg-white rounded-lg shadow-sm">
+<div className="flex items-center gap-4 p-4 w-full text-sm text-slate-400 bg-surface-card rounded-lg shadow-sm">
+```
+
+### Design Tokens
+
+Use CSS variables defined in `tokens.css`:
+
+```tsx
+// Colors - use semantic names
+className="text-primary-500"        // Teal accent
+className="bg-surface"              // Dark background
+className="bg-surface-card"         // Card background
+className="border-white/10"         // Subtle borders
+
+// Never use raw colors in components
+// BAD:  className="bg-[#0d1117]"
+// GOOD: className="bg-surface"
+```
+
+### Color Palette
+
+| Token | Usage |
+|-------|-------|
+| `primary-*` | Teal accent (buttons, links, highlights) |
+| `surface` | Main dark background |
+| `surface-card` | Card/panel backgrounds |
+| `surface-elevated` | Elevated surfaces (modals) |
+| `text-primary` | White text |
+| `text-secondary` | Slate-400 text |
+| `text-muted` | Slate-500 text |
+
+### Component Patterns
+
+```tsx
+// Button variants
+<Button>Primary Action</Button>
+<Button variant="secondary">Secondary</Button>
+
+// Status badges with dynamic colors
+<span 
+  className="px-2 py-0.5 text-xs rounded"
+  style={{ 
+    backgroundColor: `${status.color}20`,
+    color: status.color 
+  }}
+>
+  {status.name}
+</span>
+
+// Priority badges
+const PRIORITY_COLORS = {
+  urgent: '#ef4444',
+  high: '#f59e0b',
+  medium: '#3b82f6',
+  low: '#6b7280',
+};
+```
+
+### Drag & Drop (dnd-kit)
+
+```tsx
+// DndContext wrapper
+<DndContext onDragEnd={handleDragEnd}>
+  <SortableContext items={items}>
+    {items.map(item => (
+      <SortableItem key={item.id} id={item.id} />
+    ))}
+  </SortableContext>
+</DndContext>
+
+// Sortable item
+function SortableItem({ id }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      ...
+    </div>
+  );
+}
 ```
 
 ## Git Conventions

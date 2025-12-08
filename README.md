@@ -2,13 +2,40 @@
 
 A fast, minimal, developer-friendly issue tracker with AI assistance, deep Git integrations, and an architecture that scales linearly with usage.
 
+## ✨ Features
+
+### Core
+- **Workspaces** - Multi-tenant organization structure
+- **Projects** - Group issues with custom colors and settings
+- **Issues** - Full CRUD with priorities, assignees, due dates
+- **Comments** - Discussions on issues
+- **Labels** - Customizable tags per project
+- **Custom Statuses** - Configurable Kanban columns per project
+
+### Kanban Board
+- **Drag & Drop** - Move issues between columns with `@dnd-kit`
+- **Filters** - Filter by priority, assignee, or label
+- **Status Reordering** - Drag to reorder Kanban columns in settings
+
+### Search & Navigation
+- **Full-text Search** - PostgreSQL FTS for instant issue search
+- **Global Search** - `⌘K` to search across all issues
+
+### Developer Experience
+- **TypeScript End-to-End** - Full type safety from DB to UI
+- **Generated SDK** - OpenAPI spec → TypeScript client
+- **Monorepo** - pnpm workspaces for clean package boundaries
+
 ## Tech Stack
 
-- **Backend**: Node.js 20, Express (as HTTP primitive), TypeScript
-- **Frontend**: Next.js 14 (App Router), React 19, Tailwind CSS
-- **Database**: PostgreSQL 16 with Kysely (type-safe SQL)
-- **Auth**: Auth.js v5 (OAuth transport) + custom backend identity
-- **Monorepo**: pnpm workspaces
+| Layer | Technology |
+|-------|------------|
+| Backend | Node.js 20, Express (HTTP primitive), TypeScript |
+| Frontend | Next.js 14 (App Router), React 19, Tailwind CSS |
+| Database | PostgreSQL 16, Kysely (type-safe SQL) |
+| Auth | Auth.js v5 (OAuth) + Custom JWT |
+| Drag & Drop | @dnd-kit/core, @dnd-kit/sortable |
+| Monorepo | pnpm workspaces |
 
 ## Architecture
 
@@ -18,9 +45,21 @@ kanban5000/
 │   ├── backend/          # Node.js API server
 │   │   └── src/
 │   │       ├── core/     # Custom framework (HTTP, routing, DI, errors)
-│   │       ├── modules/  # Feature modules (auth, workspace)
+│   │       ├── modules/  # Feature modules
+│   │       │   ├── auth/
+│   │       │   ├── workspace/
+│   │       │   ├── project/
+│   │       │   ├── issue/
+│   │       │   ├── comment/
+│   │       │   └── label/
 │   │       └── infra/    # Database, logging
 │   ├── frontend/         # Next.js app
+│   │   ├── app/          # Routes
+│   │   └── components/
+│   │       ├── kanban/   # Board, columns, cards
+│   │       ├── search/   # Search box
+│   │       ├── nav/      # Navigation
+│   │       └── ui/       # Buttons, inputs, cards
 │   ├── api-client/       # Generated TypeScript SDK
 │   └── shared/           # Shared Zod schemas
 ├── docker-compose.yml    # PostgreSQL + Redis
@@ -29,11 +68,11 @@ kanban5000/
 
 ### Key Architectural Decisions
 
-1. **Express as HTTP Primitive**: Express only handles parsing and routing. Our `core/` layer provides typed abstractions—controllers never see `req`/`res`.
+1. **Express as HTTP Primitive** - Express only handles parsing and routing. Our `core/` layer provides typed abstractions—controllers never see `req`/`res`.
 
-2. **Auth.js at Arm's Length**: Auth.js handles OAuth flows only. The backend owns all identity (users, roles, permissions).
+2. **Auth.js at Arm's Length** - Auth.js handles OAuth flows only. The backend owns all identity (users, roles, permissions).
 
-3. **Generated SDK**: Frontend uses a TypeScript SDK generated from OpenAPI spec—no direct fetch or database access.
+3. **Generated SDK** - Frontend uses a TypeScript SDK generated from OpenAPI spec—no direct fetch or database access.
 
 ## Getting Started
 
@@ -53,26 +92,31 @@ pnpm install
 docker compose up -d
 
 # Run database migrations
-pnpm db:migrate
+cd packages/backend
+DATABASE_URL="postgresql://kanban:kanban@localhost:5433/kanban5000" pnpm db:migrate up
 
-# Start development servers
+# Start development servers (in separate terminals)
+# Backend:
+cd packages/backend
+DATABASE_URL="postgresql://kanban:kanban@localhost:5433/kanban5000" pnpm dev
+
+# Frontend:
+cd packages/frontend
 pnpm dev
 ```
 
 ### Environment Variables
 
-Create `.env` files in `packages/backend` and `packages/frontend`:
-
 **Backend** (`packages/backend/.env`):
-```
-DATABASE_URL=postgresql://kanban:kanban@localhost:5432/kanban5000
+```env
+DATABASE_URL=postgresql://kanban:kanban@localhost:5433/kanban5000
 PORT=3001
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=15m
 ```
 
 **Frontend** (`packages/frontend/.env.local`):
-```
+```env
 BACKEND_URL=http://localhost:3001
 NEXT_PUBLIC_API_URL=http://localhost:3001
 AUTH_SECRET=your-auth-secret
@@ -82,9 +126,56 @@ AUTH_GITHUB_SECRET=your-github-oauth-secret
 
 ### Development URLs
 
-- Frontend: http://localhost:3002
-- Backend API: http://localhost:3001
-- Health check: http://localhost:3001/health
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3002 |
+| Backend API | http://localhost:3001 |
+| Health Check | http://localhost:3001/health |
+
+### Demo Login
+
+For development, use the credentials login:
+- Email: `alice@example.com` (or any email with sample data)
+- Password: `password`
+
+## API Endpoints
+
+### Auth
+- `POST /auth/sync` - Sync OAuth user to backend
+- `POST /auth/dev-login` - Developer login (dev mode only)
+
+### Workspaces
+- `GET /workspaces` - List user's workspaces
+- `POST /workspaces` - Create workspace
+- `GET /workspaces/:id` - Get workspace
+- `PATCH /workspaces/:id` - Update workspace
+- `DELETE /workspaces/:id` - Delete workspace
+
+### Projects
+- `GET /workspaces/:id/projects` - List projects in workspace
+- `POST /workspaces/:id/projects` - Create project
+- `GET /projects/:id` - Get project
+- `PATCH /projects/:id` - Update project
+- `DELETE /projects/:id` - Delete project
+- `GET /projects/:id/statuses` - Get project statuses
+- `POST /projects/:id/statuses` - Create status
+- `PUT /projects/:id/statuses/order` - Reorder statuses
+- `GET /projects/:id/labels` - Get project labels
+- `POST /projects/:id/labels` - Create label
+
+### Issues
+- `GET /projects/:id/issues` - List issues
+- `POST /projects/:id/issues` - Create issue
+- `GET /projects/:projectId/issues/search` - Search issues
+- `GET /issues/:id` - Get issue
+- `PATCH /issues/:id` - Update issue
+- `DELETE /issues/:id` - Delete issue
+
+### Comments
+- `GET /issues/:id/comments` - List comments
+- `POST /issues/:id/comments` - Create comment
+- `PATCH /comments/:id` - Update comment
+- `DELETE /comments/:id` - Delete comment
 
 ## Scripts
 
@@ -95,9 +186,6 @@ pnpm dev
 # Run database migrations
 pnpm db:migrate
 
-# Create new migration
-pnpm db:migrate:create -- migration_name
-
 # Generate OpenAPI spec + SDK
 pnpm generate:api
 
@@ -106,35 +194,23 @@ pnpm lint
 
 # Run type checking
 pnpm typecheck
-
-# Run tests
-pnpm test
 ```
 
-## Project Structure
+## Frontend Routes
 
-### Backend Modules
-
-Each module follows a consistent pattern:
-
-```
-modules/workspace/
-├── workspace.repository.ts  # Data access (Kysely)
-├── workspace.service.ts     # Business logic
-├── workspace.controller.ts  # HTTP handlers
-├── workspace.routes.ts      # Route definitions + OpenAPI
-├── workspace.types.ts       # Types
-└── index.ts                 # Exports
-```
-
-### Frontend Routes
-
-- `/` - Landing page
-- `/login` - Authentication
-- `/workspaces` - List workspaces (auth required)
-- `/workspaces/new` - Create workspace
-- `/workspaces/[id]` - Workspace detail
-- `/workspaces/[id]/settings` - Workspace settings
+| Route | Description |
+|-------|-------------|
+| `/` | Redirects to `/workspaces` or `/login` |
+| `/login` | Authentication page |
+| `/workspaces` | List all workspaces |
+| `/workspaces/new` | Create workspace form |
+| `/workspaces/[id]` | Workspace with projects list |
+| `/workspaces/[id]/settings` | Workspace settings |
+| `/workspaces/[id]/projects/new` | Create project form |
+| `/workspaces/[id]/projects/[projectId]` | Kanban board |
+| `/workspaces/[id]/projects/[projectId]/settings` | Project settings (statuses, labels) |
+| `/workspaces/[id]/projects/[projectId]/issues/new` | Create issue form |
+| `/workspaces/[id]/projects/[projectId]/issues/[issueId]` | Issue detail |
 
 ## Documentation
 
@@ -149,29 +225,36 @@ See `.cursor/` directory for detailed architectural documentation:
 
 ## Roadmap
 
-### Phase 1 - Foundations (Current)
+### Phase 1 - Foundations ✅
 - [x] Workspaces, users, authentication
-- [ ] Projects, issues, comments
-- [ ] Custom statuses + workflow engine
-- [ ] GitHub/GitLab integration
+- [x] Projects with custom colors
+- [x] Issues with priorities, assignees
+- [x] Comments on issues
+- [x] Custom statuses (Kanban columns)
+- [x] Labels per project
+- [x] Drag-and-drop Kanban board
+- [x] Full-text search
+- [x] Filters (priority, assignee, label)
+- [x] Status reordering
 
-### Phase 2 - Scalable Core
-- [ ] Full-text search
+### Phase 2 - Enhanced UX
+- [ ] Quick issue creation (inline)
+- [ ] Keyboard shortcuts
+- [ ] Due date warnings
+- [ ] Issue history/activity log
+- [ ] Markdown support in descriptions
+
+### Phase 3 - Integrations
+- [ ] GitHub integration
+- [ ] GitLab integration
+- [ ] Webhooks
+
+### Phase 4 - Scalability
 - [ ] Redis caching
-- [ ] Attachments (S3)
+- [ ] File attachments (S3)
 - [ ] Real-time updates (WebSocket)
-
-### Phase 3 - Advanced Features
-- [ ] Workflow engine
-- [ ] Notifications
-- [ ] Analytics
-
-### Phase 4 - Operations
 - [ ] CI/CD pipeline
-- [ ] Observability
-- [ ] Multi-tenancy
 
 ## License
 
 MIT
-

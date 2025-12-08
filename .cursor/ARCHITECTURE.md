@@ -18,12 +18,28 @@ kanban5000/
 │   │       │   └── errors/     # Typed error hierarchy
 │   │       ├── modules/        # Feature modules
 │   │       │   ├── auth/       # Identity, sessions, permissions
-│   │       │   └── workspace/  # First domain module
+│   │       │   ├── workspace/  # Multi-tenant workspaces
+│   │       │   ├── project/    # Projects, statuses, labels
+│   │       │   ├── issue/      # Issues, full-text search
+│   │       │   ├── comment/    # Issue comments
+│   │       │   └── label/      # Label management
 │   │       ├── infra/          # Infrastructure (db, logging)
 │   │       └── index.ts        # Bootstrap only
 │   ├── frontend/               # Next.js 14 App Router
 │   │   ├── app/               # Routes (thin, calls SDK)
-│   │   ├── components/        # React components
+│   │   │   ├── (auth)/        # Authenticated routes
+│   │   │   │   └── workspaces/
+│   │   │   │       └── [id]/
+│   │   │   │           └── projects/
+│   │   │   │               └── [projectId]/
+│   │   │   │                   ├── page.tsx      # Kanban board
+│   │   │   │                   └── settings/     # Statuses, labels
+│   │   │   └── api/           # API route handlers
+│   │   ├── components/
+│   │   │   ├── kanban/        # Board, column, card components
+│   │   │   ├── search/        # Search box with dropdown
+│   │   │   ├── nav/           # Navigation bar
+│   │   │   └── ui/            # Buttons, inputs, cards
 │   │   └── lib/               # SDK instance, auth helpers
 │   ├── api-client/            # Generated TypeScript SDK
 │   │   └── src/generated/     # Auto-generated from OpenAPI
@@ -42,14 +58,53 @@ kanban5000/
 | Database | PostgreSQL 16 |
 | Migrations | node-pg-migrate |
 | Query Builder | Kysely (type-safe SQL) |
+| Full-text Search | PostgreSQL FTS (tsvector, GIN) |
 | Frontend | Next.js 14 (App Router) |
+| UI Framework | React 19, Tailwind CSS |
+| Drag & Drop | @dnd-kit/core, @dnd-kit/sortable |
 | Auth Transport | Auth.js v5 (OAuth/session cookies only) |
-| Identity/Permissions | Custom backend models |
+| Identity/Permissions | Custom backend models + JWT |
 | Frontend-to-Backend | Generated SDK from OpenAPI |
 | OpenAPI Generation | @asteasolutions/zod-to-openapi |
 | SDK Generation | openapi-typescript-codegen |
 | Validation | Zod (shared schemas) |
 | Monorepo | pnpm workspaces |
+
+## Implemented Features
+
+### Backend Modules
+
+| Module | Features |
+|--------|----------|
+| **auth** | OAuth sync, JWT issuance, developer login, permission checks |
+| **workspace** | CRUD, membership, settings |
+| **project** | CRUD, custom statuses, status reordering, labels |
+| **issue** | CRUD, priorities, assignees, full-text search |
+| **comment** | CRUD on issues |
+| **label** | CRUD per project |
+
+### Frontend Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `KanbanBoard` | `components/kanban/` | Drag-and-drop board with columns |
+| `KanbanColumn` | `components/kanban/` | Droppable column container |
+| `KanbanCard` | `components/kanban/` | Draggable issue card |
+| `IssueCard` | `components/kanban/` | Issue display with labels |
+| `SearchBox` | `components/search/` | Global search with dropdown |
+| `NavBar` | `components/nav/` | Main navigation with search |
+| `Button` | `components/ui/` | Primary/secondary button variants |
+| `Input` | `components/ui/` | Form input field |
+| `Card` | `components/ui/` | Container card |
+
+### UI Features
+
+- **Kanban Board** with drag-and-drop (`@dnd-kit`)
+- **Filters** by priority, assignee, label
+- **Full-text Search** with PostgreSQL FTS
+- **Status Reordering** via drag-and-drop in settings
+- **Color-coded labels** per project
+- **Priority badges** (Urgent, High, Medium, Low)
 
 ## Architectural Principles
 
@@ -100,13 +155,13 @@ Zod Schemas ──▶ OpenAPI Spec ──▶ TypeScript SDK ──▶ Next.js
 Each backend feature module follows this structure:
 
 ```
-modules/workspace/
-├── workspace.repository.ts   # Data access (Kysely queries)
-├── workspace.service.ts      # Business logic
-├── workspace.controller.ts   # HTTP handlers (thin, calls service)
-├── workspace.routes.ts       # Route definitions + OpenAPI schemas
-├── workspace.types.ts        # Module-specific types
-└── index.ts                  # Public exports
+modules/project/
+├── project.repository.ts   # Data access (Kysely queries)
+├── project.service.ts      # Business logic
+├── project.controller.ts   # HTTP handlers (thin, calls service)
+├── project.routes.ts       # Route definitions + OpenAPI schemas
+├── project.types.ts        # Module-specific types
+└── index.ts                # Public exports
 ```
 
 ### Layer Responsibilities
@@ -125,40 +180,80 @@ Controller → Service → Repository → Database
   AuthMiddleware  AuthService
 ```
 
-## Data Flow
+## Database Schema
 
-### Read Operation
+### Core Tables
+
+```sql
+-- Users and permissions
+users              -- id, email, name, image, provider, provider_id
+roles              -- id, name (admin, member, viewer)
+permissions        -- id, name (workspace:*, project:*, issue:*)
+role_permissions   -- role_id, permission_id
+user_roles         -- user_id, role_id, workspace_id
+
+-- Multi-tenant structure
+workspaces         -- id, name, slug, owner_id, settings (JSONB)
+workspace_members  -- workspace_id, user_id, role
+
+-- Projects and issues
+projects           -- id, workspace_id, name, slug, description, color
+issue_statuses     -- id, project_id, name, color, position, is_default
+labels             -- id, project_id, name, color
+issues             -- id, project_id, status_id, number, title, description, priority, assignee_id
+issue_labels       -- issue_id, label_id
+issue_history      -- id, issue_id, user_id, field, old_value, new_value
+comments           -- id, issue_id, user_id, content
+```
+
+### Full-text Search
+
+Issues use PostgreSQL FTS with a computed `search_vector` column:
+
+```sql
+ALTER TABLE issues ADD COLUMN search_vector tsvector;
+CREATE INDEX issues_search_idx ON issues USING GIN (search_vector);
+
+-- Trigger updates search_vector on title/description change
+```
+
+### Conventions
+
+- Tables: `snake_case`, plural (`workspaces`, `user_roles`)
+- Columns: `snake_case` (`created_at`, `owner_id`)
+- Primary keys: UUID with `DEFAULT gen_random_uuid()`
+- Timestamps: `created_at` and `updated_at` on every table
+- JSONB: For settings, metadata, custom fields (with GIN indexes)
+
+## API Design
+
+RESTful endpoints with consistent response format:
 
 ```
-1. HTTP Request arrives
-2. Express parses JSON, routes to handler
-3. Auth middleware validates JWT, attaches user to request
-4. RouteBuilder wraps Express req into AppRequest
-5. Controller extracts params, calls service.findById(id)
-6. Service checks permissions via AuthService
-7. Service calls repository.findById(id)
-8. Repository executes Kysely query
-9. Repository maps row to domain object
-10. Service returns domain object
-11. Controller returns { data: workspace }
-12. Framework serializes to JSON response
-```
+GET    /api/workspaces                    → { data: Workspace[] }
+POST   /api/workspaces                    → { data: Workspace }
+GET    /api/workspaces/:id                → { data: Workspace }
+PATCH  /api/workspaces/:id                → { data: Workspace }
+DELETE /api/workspaces/:id                → { success: true }
 
-### Write Operation with Validation
+GET    /api/workspaces/:id/projects       → { data: Project[] }
+POST   /api/workspaces/:id/projects       → { data: Project }
 
-```
-1. HTTP Request with JSON body arrives
-2. Express parses JSON
-3. RouteBuilder validates body against Zod schema
-4. Validation fails → ValidationError thrown → 400 response
-5. Validation passes → Controller receives typed body
-6. Controller calls service.create(body)
-7. Service checks permissions
-8. Service calls repository.create(data)
-9. Repository inserts row, returns domain object
-10. Service returns created object
-11. Controller returns { data: created }
-12. Framework serializes to 201 JSON response
+GET    /api/projects/:id                  → { data: Project }
+GET    /api/projects/:id/statuses         → { data: IssueStatus[] }
+POST   /api/projects/:id/statuses         → { data: IssueStatus }
+PUT    /api/projects/:id/statuses/order   → { data: IssueStatus[] }
+GET    /api/projects/:id/labels           → { data: Label[] }
+
+GET    /api/projects/:id/issues           → { data: Issue[] }
+GET    /api/projects/:id/issues/search    → { data: Issue[] }
+POST   /api/projects/:id/issues           → { data: Issue }
+
+GET    /api/issues/:id                    → { data: Issue }
+PATCH  /api/issues/:id                    → { data: Issue }
+
+GET    /api/issues/:id/comments           → { data: Comment[] }
+POST   /api/issues/:id/comments           → { data: Comment }
 ```
 
 ## Error Handling
@@ -204,24 +299,42 @@ Error handler middleware catches all errors and formats response:
 }
 ```
 
-## Database Schema Conventions
+## Frontend Architecture
 
-- Tables: `snake_case`, plural (`workspaces`, `user_roles`)
-- Columns: `snake_case` (`created_at`, `owner_id`)
-- Primary keys: UUID with `DEFAULT gen_random_uuid()`
-- Timestamps: `created_at` and `updated_at` on every table
-- JSONB: For settings, metadata, custom fields (with GIN indexes)
-
-## API Design
-
-RESTful endpoints with consistent response format:
+### Page Structure
 
 ```
-GET    /api/workspaces          → { data: Workspace[] }
-POST   /api/workspaces          → { data: Workspace }
-GET    /api/workspaces/:id      → { data: Workspace }
-PATCH  /api/workspaces/:id      → { data: Workspace }
-DELETE /api/workspaces/:id      → { success: true }
+app/(auth)/workspaces/[id]/projects/[projectId]/page.tsx
+├── State: project, statuses, issues, labels, filters
+├── Data fetching: useCallback + Promise.all
+├── Filter logic: useMemo for filteredIssues
+└── Render: Header → Filter bar → KanbanBoard
+```
+
+### Kanban Board Flow
+
+```
+KanbanBoard (DndContext)
+├── onDragStart → highlight dropzones
+├── onDragEnd → call onIssueMove(issueId, newStatusId)
+└── KanbanColumn (useDroppable)
+    └── KanbanCard (useDraggable)
+        └── IssueCard (display only)
+```
+
+### Filter Implementation
+
+Filters are client-side for fast UX:
+
+```typescript
+const filteredIssues = useMemo(() => {
+  return issues.filter((issue) => {
+    if (filters.priority && issue.priority !== filters.priority) return false;
+    if (filters.assigneeId && issue.assignee?.id !== filters.assigneeId) return false;
+    if (filters.labelId && !issue.labels.includes(filters.labelId)) return false;
+    return true;
+  });
+}, [issues, filters]);
 ```
 
 ## Future Scalability
@@ -230,9 +343,10 @@ The architecture supports future growth:
 
 1. **Database**: pgbouncer, read replicas, table partitioning
 2. **Caching**: Redis layer for hot data
-3. **Search**: Migrate from Postgres FTS to Elasticsearch/Meilisearch
+3. **Search**: Migrate from Postgres FTS to Elasticsearch/Meilisearch if needed
 4. **Events**: Migrate from NOTIFY/LISTEN to Kafka/RabbitMQ
 5. **Services**: Extract modules into microservices when bottlenecks appear
+6. **Real-time**: WebSocket for live updates
 
 ## See Also
 
@@ -241,4 +355,3 @@ The architecture supports future growth:
 - [Database Rules](./rules/database.mdc)
 - [Auth Rules](./rules/auth.mdc)
 - [Conventions](./CONVENTIONS.md)
-
