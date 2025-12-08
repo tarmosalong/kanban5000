@@ -76,6 +76,17 @@ interface HistoryEntry {
   };
 }
 
+interface Member {
+  userId: string;
+  role: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    image: string | null;
+  };
+}
+
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low', color: '#6b7280' },
   { value: 'medium', label: 'Medium', color: '#3b82f6' },
@@ -94,12 +105,16 @@ export default function IssuePage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [statuses, setStatuses] = useState<IssueStatus[]>([]);
   const [projectLabels, setProjectLabels] = useState<Label[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showLabelPicker, setShowLabelPicker] = useState(false);
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
   const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentContent, setEditingCommentContent] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const { addToast } = useToast();
 
@@ -109,22 +124,25 @@ export default function IssuePage() {
 
   async function fetchData() {
     try {
-      const [issueRes, commentsRes, statusesRes, labelsRes] = await Promise.all([
+      const [issueRes, commentsRes, statusesRes, labelsRes, membersRes] = await Promise.all([
         fetch(`/api/issues/${issueId}`),
         fetch(`/api/issues/${issueId}/comments`),
         fetch(`/api/projects/${projectId}/statuses`),
         fetch(`/api/projects/${projectId}/labels`),
+        fetch(`/api/workspaces/${workspaceId}/members`),
       ]);
 
       const issueData = await issueRes.json();
       const commentsData = await commentsRes.json();
       const statusesData = await statusesRes.json();
       const labelsData = await labelsRes.json();
+      const membersData = await membersRes.json();
 
       setIssue(issueData.data);
       setComments(commentsData.data || []);
       setStatuses(statusesData.data || []);
       setProjectLabels(labelsData.data || []);
+      setMembers(membersData.data || []);
 
       // Fetch history separately to avoid blocking main data
       try {
@@ -215,6 +233,25 @@ export default function IssuePage() {
     }
   }
 
+  async function handleAssigneeChange(userId: string | null) {
+    try {
+      const res = await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignedTo: userId }),
+      });
+
+      if (res.ok) {
+        addToast(userId ? 'Assignee updated' : 'Assignee removed', 'success');
+        setShowAssigneePicker(false);
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Failed to update assignee:', err);
+      addToast('Failed to update assignee', 'error');
+    }
+  }
+
   async function handleSaveDescription() {
     try {
       const res = await fetch(`/api/issues/${issueId}`, {
@@ -253,12 +290,63 @@ export default function IssuePage() {
 
       if (res.ok) {
         setNewComment('');
+        addToast('Comment added', 'success');
         fetchData();
       }
     } catch (err) {
       console.error('Failed to add comment:', err);
+      addToast('Failed to add comment', 'error');
     } finally {
       setSubmittingComment(false);
+    }
+  }
+
+  function startEditingComment(comment: Comment) {
+    setEditingCommentId(comment.id);
+    setEditingCommentContent(comment.content);
+  }
+
+  function cancelEditingComment() {
+    setEditingCommentId(null);
+    setEditingCommentContent('');
+  }
+
+  async function handleSaveComment() {
+    if (!editingCommentId || !editingCommentContent.trim()) return;
+
+    try {
+      const res = await fetch(`/api/comments/${editingCommentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editingCommentContent }),
+      });
+
+      if (res.ok) {
+        addToast('Comment updated', 'success');
+        cancelEditingComment();
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Failed to update comment:', err);
+      addToast('Failed to update comment', 'error');
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+
+    try {
+      const res = await fetch(`/api/comments/${commentId}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        addToast('Comment deleted', 'success');
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Failed to delete comment:', err);
+      addToast('Failed to delete comment', 'error');
     }
   }
 
@@ -387,33 +475,85 @@ export default function IssuePage() {
 
             <div className="space-y-4 mb-6">
               {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3">
+                <div key={comment.id} className="group flex gap-3">
                   {comment.author.image ? (
                     <img
                       src={comment.author.image}
                       alt=""
-                      className="w-8 h-8 rounded-full"
+                      className="w-8 h-8 rounded-full flex-shrink-0"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center text-sm text-primary-400">
+                    <div className="w-8 h-8 rounded-full bg-primary-500/20 flex items-center justify-center text-sm text-primary-400 flex-shrink-0">
                       {(comment.author.name || comment.author.email)[0].toUpperCase()}
                     </div>
                   )}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-sm text-white">
-                        {comment.author.name || comment.author.email}
-                      </span>
-                      <span className="text-slate-500 text-xs">
-                        {new Date(comment.createdAt).toLocaleDateString()}
-                      </span>
-                      {comment.editedAt && (
-                        <span className="text-slate-500 text-xs">(edited)</span>
-                      )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-white">
+                          {comment.author.name || comment.author.email}
+                        </span>
+                        <span className="text-slate-500 text-xs">
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                        </span>
+                        {comment.editedAt && (
+                          <span className="text-slate-500 text-xs">(edited)</span>
+                        )}
+                      </div>
+                      
+                      {/* Edit/Delete buttons - visible on hover */}
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => startEditingComment(comment)}
+                          className="p-1 text-slate-500 hover:text-primary-400 transition-colors"
+                          title="Edit comment"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteComment(comment.id)}
+                          className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                          title="Delete comment"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap">
-                      {comment.content}
-                    </p>
+                    
+                    {/* Comment content - editable or markdown */}
+                    {editingCommentId === comment.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editingCommentContent}
+                          onChange={(e) => setEditingCommentContent(e.target.value)}
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none text-sm"
+                          rows={4}
+                          autoFocus
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={cancelEditingComment}
+                            className="px-3 py-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveComment}
+                            className="px-3 py-1.5 text-xs bg-primary-500 text-white rounded hover:bg-primary-600 transition-colors"
+                          >
+                            Save
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="prose prose-sm prose-invert max-w-none">
+                        <Markdown content={comment.content} />
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -429,11 +569,14 @@ export default function IssuePage() {
               <textarea
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Add a comment..."
+                placeholder="Add a comment... (Markdown supported)"
                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:border-transparent resize-none text-sm text-white placeholder-slate-500"
                 rows={3}
               />
-              <div className="flex justify-end mt-2">
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-[10px] text-slate-500">
+                  **bold**, *italic*, `code`, [links](url)
+                </p>
                 <Button
                   type="submit"
                   disabled={submittingComment || !newComment.trim()}
@@ -644,26 +787,88 @@ export default function IssuePage() {
 
           {/* Assignee */}
           <Card className="p-4 bg-surface-card border-white/[0.06]">
-            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Assignee</h3>
-            {issue.assignee ? (
-              <div className="flex items-center gap-2">
-                {issue.assignee.image ? (
-                  <img
-                    src={issue.assignee.image}
-                    alt=""
-                    className="w-6 h-6 rounded-full"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-primary-500/20 flex items-center justify-center text-xs text-primary-400">
-                    {(issue.assignee.name || issue.assignee.email)[0].toUpperCase()}
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Assignee</h3>
+              <button
+                onClick={() => setShowAssigneePicker(!showAssigneePicker)}
+                className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+              >
+                {showAssigneePicker ? 'Done' : 'Edit'}
+              </button>
+            </div>
+            
+            {showAssigneePicker ? (
+              <div className="space-y-1">
+                {/* Unassign option */}
+                <button
+                  onClick={() => handleAssigneeChange(null)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                    !issue.assignee
+                      ? 'bg-primary-500/20 text-primary-400'
+                      : 'hover:bg-white/5 text-slate-400'
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-full bg-slate-500/20 flex items-center justify-center text-xs text-slate-500">
+                    —
                   </div>
+                  <span className="text-sm">Unassigned</span>
+                </button>
+                
+                {/* Member options */}
+                {members.map((member) => (
+                  <button
+                    key={member.userId}
+                    onClick={() => handleAssigneeChange(member.userId)}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
+                      issue.assignee?.id === member.userId
+                        ? 'bg-primary-500/20 text-primary-400'
+                        : 'hover:bg-white/5 text-slate-300'
+                    }`}
+                  >
+                    {member.user.image ? (
+                      <img
+                        src={member.user.image}
+                        alt=""
+                        className="w-6 h-6 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-primary-500/20 flex items-center justify-center text-xs text-primary-400">
+                        {(member.user.name || member.user.email)[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-sm truncate">
+                      {member.user.name || member.user.email}
+                    </span>
+                  </button>
+                ))}
+                
+                {members.length === 0 && (
+                  <p className="text-slate-500 text-xs text-center py-2">No members found</p>
                 )}
-                <span className="text-sm text-white">
-                  {issue.assignee.name || issue.assignee.email}
-                </span>
               </div>
             ) : (
-              <p className="text-slate-500 text-sm">Unassigned</p>
+              <>
+                {issue.assignee ? (
+                  <div className="flex items-center gap-2">
+                    {issue.assignee.image ? (
+                      <img
+                        src={issue.assignee.image}
+                        alt=""
+                        className="w-6 h-6 rounded-full"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-primary-500/20 flex items-center justify-center text-xs text-primary-400">
+                        {(issue.assignee.name || issue.assignee.email)[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-sm text-white">
+                      {issue.assignee.name || issue.assignee.email}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-sm">Unassigned</p>
+                )}
+              </>
             )}
           </Card>
 
