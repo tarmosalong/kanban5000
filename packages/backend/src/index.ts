@@ -20,6 +20,18 @@ import {
   WorkspaceController,
   createWorkspaceRoutes,
 } from './modules/workspace/index.js';
+import {
+  ProjectRepository,
+  ProjectService,
+  ProjectController,
+  createProjectRoutes,
+} from './modules/project/index.js';
+import {
+  IssueRepository,
+  IssueService,
+  IssueController,
+  createIssueRoutes,
+} from './modules/issue/index.js';
 
 // Configuration
 const config = {
@@ -62,9 +74,23 @@ async function bootstrap(): Promise<void> {
   container.register('AuthService', authService);
   container.register('WorkspaceService', workspaceService);
 
+  // Create project module
+  const projectRepository = new ProjectRepository(db);
+  const projectService = new ProjectService(projectRepository, workspaceRepository);
+  container.register('ProjectRepository', projectRepository);
+  container.register('ProjectService', projectService);
+
+  // Create issue module
+  const issueRepository = new IssueRepository(db);
+  const issueService = new IssueService(issueRepository, projectRepository, workspaceRepository);
+  container.register('IssueRepository', issueRepository);
+  container.register('IssueService', issueService);
+
   // Create controllers
   const authController = new AuthController(authService);
   const workspaceController = new WorkspaceController(workspaceService);
+  const projectController = new ProjectController(projectService);
+  const issueController = new IssueController(issueService);
 
   // Create Express app
   const app = express();
@@ -87,6 +113,8 @@ async function bootstrap(): Promise<void> {
   const router = new Router();
   router.addAll(createAuthRoutes(authController));
   router.addAll(createWorkspaceRoutes(workspaceController));
+  router.addAll(createProjectRoutes(projectController));
+  router.addAll(createIssueRoutes(issueController));
 
   // Mount routes
   router.mount(app, '/api');

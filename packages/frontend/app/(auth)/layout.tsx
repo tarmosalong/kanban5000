@@ -15,59 +15,65 @@ export default async function AuthLayout({
   }
 
   return (
-    <div className="min-h-screen bg-surface-secondary dark:bg-slate-900">
+    <div className="min-h-screen">
       {/* Navigation */}
-      <nav className="bg-surface dark:bg-slate-800 border-b border-border sticky top-0 z-10">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-8">
-              <Link href="/" className="font-bold text-xl text-primary-600">
-                Kanban5000
-              </Link>
-              <div className="hidden sm:flex items-center gap-6">
-                <Link
-                  href="/workspaces"
-                  className="text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white text-sm font-medium"
-                >
-                  Workspaces
-                </Link>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                {session.user?.image && (
-                  <img
-                    src={session.user.image}
-                    alt={session.user.name || 'User'}
-                    className="h-8 w-8 rounded-full"
-                  />
-                )}
-                <span className="text-sm text-slate-700 dark:text-slate-300">
-                  {session.user?.name || session.user?.email}
-                </span>
-              </div>
-              <form
-                action={async () => {
-                  'use server';
-                  await signOut({ redirectTo: '/' });
-                }}
+      <nav className="nav-bar sticky top-0 z-50">
+        <div className="h-full max-w-[1800px] mx-auto px-4 sm:px-6 flex items-center justify-between">
+          {/* Left */}
+          <div className="flex items-center gap-8">
+            <Link 
+              href="/workspaces" 
+              className="font-bold text-lg bg-gradient-to-r from-primary-400 to-primary-500 bg-clip-text text-transparent hover:from-primary-300 hover:to-primary-400 transition-all"
+            >
+              Kanban5000
+            </Link>
+            <div className="hidden sm:flex items-center gap-1">
+              <Link
+                href="/workspaces"
+                className="px-3 py-1.5 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
               >
-                <button
-                  type="submit"
-                  className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                >
-                  Sign out
-                </button>
-              </form>
+                Workspaces
+              </Link>
             </div>
+          </div>
+
+          {/* Right */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {session.user?.image ? (
+                <img
+                  src={session.user.image}
+                  alt={session.user.name || 'User'}
+                  className="h-7 w-7 rounded-full ring-1 ring-white/10"
+                />
+              ) : (
+                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-xs font-medium text-white">
+                  {(session.user?.name || session.user?.email || 'U')[0].toUpperCase()}
+                </div>
+              )}
+              <span className="text-sm text-slate-300 hidden sm:block">
+                {session.user?.name || session.user?.email?.split('@')[0]}
+              </span>
+            </div>
+            <form
+              action={async () => {
+                'use server';
+                await signOut({ redirectTo: '/' });
+              }}
+            >
+              <button
+                type="submit"
+                className="text-sm text-slate-500 hover:text-white px-2 py-1 hover:bg-white/5 rounded transition-colors"
+              >
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
       </nav>
 
       {/* Main content */}
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">{children}</main>
+      <main className="max-w-[1800px] mx-auto">{children}</main>
     </div>
   );
 }
-
