@@ -1,0 +1,123 @@
+# Backend Architecture Rules
+
+## Express as HTTP Primitive
+
+Express is used ONLY as a low-level HTTP library. It handles:
+- JSON parsing
+- Routing dispatch
+- Middleware chaining
+
+Express `req` and `res` objects are NEVER exposed to business logic.
+
+## Core Framework Layer (`packages/backend/src/core/`)
+
+### HTTP Abstractions (`core/http/`)
+
+```typescript
+// Controllers receive typed requests, return plain objects
+type AppRequest<TBody, TParams, TQuery> = {
+  body: TBody;
+  params: TParams;
+  query: TQuery;
+  user: AuthenticatedUser | null;
+  requestId: string;
+};
+
+// Controllers return data, never call res.json() directly
+type AppResponse<T> = {
+  data: T;
+  status?: number;
+};
+```
+
+### Routing (`core/routing/`)
+
+Use the declarative RouteBuilder:
+
+```typescript
+// GOOD - Declarative route definition with OpenAPI metadata
+router
+  .post('/workspaces')
+  .body(CreateWorkspaceSchema)
+  .response(WorkspaceSchema)
+  .handler(workspaceController.create);
+
+// BAD - Direct Express usage
+app.post('/workspaces', (req, res) => { ... });
+```
+
+### Dependency Injection (`core/container/`)
+
+Register services by interface at bootstrap:
+
+```typescript
+// Registration (in bootstrap)
+container.register('WorkspaceRepository', new PostgresWorkspaceRepository(db));
+container.register('WorkspaceService', new WorkspaceService(
+  container.resolve('WorkspaceRepository')
+));
+
+// Resolution (in route setup)
+const service = container.resolve<IWorkspaceService>('WorkspaceService');
+```
+
+### Error Handling (`core/errors/`)
+
+Throw typed errors, never call `res.status()`:
+
+```typescript
+// GOOD - Throw typed error
+throw new NotFoundError('Workspace', id);
+throw new ValidationError('Invalid workspace name', errors);
+throw new UnauthorizedError('Missing permission: workspace.create');
+
+// BAD - Manual status codes
+res.status(404).json({ error: 'Not found' });
+```
+
+## Module Structure
+
+Each feature module follows this structure:
+
+```
+modules/workspace/
+├── workspace.repository.ts   # Data access (Kysely queries)
+├── workspace.service.ts      # Business logic
+├── workspace.controller.ts   # HTTP handlers (thin, calls service)
+├── workspace.routes.ts       # Route definitions + OpenAPI schemas
+├── workspace.types.ts        # Module-specific types
+└── index.ts                  # Public exports
+```
+
+### Repository Layer
+- Direct Kysely queries only
+- No business logic
+- Returns domain objects or null
+- Interface-based for testability
+
+### Service Layer
+- All business logic here
+- Validates permissions via AuthService
+- Coordinates between repositories
+- Throws domain errors
+
+### Controller Layer
+- Extremely thin
+- Extracts data from AppRequest
+- Calls service methods
+- Returns data (framework handles response)
+
+## Patterns to Follow
+
+1. **Constructor injection** - Services receive dependencies via constructor
+2. **Interface segregation** - Small, focused interfaces
+3. **Repository pattern** - Data access behind interfaces
+4. **Result types for errors** - Use typed errors, not try/catch for flow control
+
+## Anti-patterns to Avoid
+
+1. **NO** direct Express req/res access in controllers
+2. **NO** business logic in controllers
+3. **NO** database queries in services (use repositories)
+4. **NO** circular dependencies between modules
+5. **NO** importing from other modules' internal files (use index.ts exports)

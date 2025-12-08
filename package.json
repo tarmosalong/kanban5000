@@ -1,0 +1,24 @@
+{
+  "name": "kanban5000",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A fast, minimal, developer-friendly issue tracker",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter @kanban5000/backend db:migrate",
+    "db:migrate:create": "pnpm --filter @kanban5000/backend db:migrate:create",
+    "db:reset": "pnpm --filter @kanban5000/backend db:reset",
+    "generate:api": "pnpm --filter @kanban5000/backend generate:openapi && pnpm --filter @kanban5000/api-client generate",
+    "clean": "pnpm -r clean && rm -rf node_modules"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.14.2"
+}
+

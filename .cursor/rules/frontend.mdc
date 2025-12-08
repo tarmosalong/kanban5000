@@ -1,0 +1,166 @@
+# Frontend Architecture Rules
+
+## Core Principle: SDK-First
+
+The frontend NEVER directly accesses the database or makes raw HTTP calls.
+All data fetching goes through the generated TypeScript SDK.
+
+```typescript
+// GOOD - Using generated SDK
+import { api } from '@/lib/api';
+const workspaces = await api.workspaces.list();
+const workspace = await api.workspaces.create({ name: 'My Project' });
+
+// BAD - Direct fetch
+const res = await fetch('/api/workspaces');
+
+// BAD - Direct database access
+import { db } from '@/lib/db';  // This should not exist
+const workspaces = await db.query.workspaces.findMany();
+```
+
+## Project Structure
+
+```
+packages/frontend/
+├── app/                    # Next.js App Router
+│   ├── (auth)/            # Auth-required routes (grouped)
+│   │   └── workspaces/
+│   ├── api/auth/          # Auth.js API routes only
+│   └── layout.tsx
+├── components/
+│   ├── ui/                # Base components (Button, Input, Card)
+│   └── features/          # Feature-specific components
+├── lib/
+│   ├── api.ts             # SDK instance with auth
+│   └── auth.ts            # Auth.js configuration
+└── styles/
+    └── tokens.css         # Design tokens as CSS variables
+```
+
+## Auth.js Integration
+
+Auth.js handles OAuth flow only. Identity lives in the backend.
+
+```typescript
+// lib/auth.ts
+export const authConfig = {
+  callbacks: {
+    async signIn({ user, account }) {
+      // Sync user to backend, get backend JWT
+      const response = await fetch(`${BACKEND_URL}/auth/sync`, {
+        method: 'POST',
+        body: JSON.stringify({
+          provider: account.provider,
+          providerAccountId: account.providerAccountId,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        }),
+      });
+      const { token } = await response.json();
+      // Store backend token in session
+      user.backendToken = token;
+      return true;
+    },
+    async session({ session, token }) {
+      // Include backend token in session
+      session.backendToken = token.backendToken;
+      return session;
+    },
+  },
+};
+```
+
+## SDK Configuration
+
+```typescript
+// lib/api.ts
+import { createClient } from '@kanban5000/api-client';
+import { getSession } from 'next-auth/react';
+
+export const api = createClient({
+  baseUrl: process.env.NEXT_PUBLIC_API_URL,
+  getAuthToken: async () => {
+    const session = await getSession();
+    return session?.backendToken;
+  },
+});
+```
+
+## Data Fetching Patterns
+
+### Server Components
+```typescript
+// app/(auth)/workspaces/page.tsx
+import { api } from '@/lib/api';
+
+export default async function WorkspacesPage() {
+  const workspaces = await api.workspaces.list();
+  return <WorkspaceList workspaces={workspaces} />;
+}
+```
+
+### Client Components with Mutations
+```typescript
+'use client';
+import { api } from '@/lib/api';
+import { useState } from 'react';
+
+export function CreateWorkspaceForm() {
+  const [pending, setPending] = useState(false);
+  
+  async function handleSubmit(data: CreateWorkspaceInput) {
+    setPending(true);
+    try {
+      await api.workspaces.create(data);
+      // Revalidate or redirect
+    } finally {
+      setPending(false);
+    }
+  }
+  // ...
+}
+```
+
+## Component Guidelines
+
+### UI Components (`components/ui/`)
+- Pure presentational
+- Accept props, emit events
+- No data fetching
+- Use design tokens from CSS variables
+
+### Feature Components (`components/features/`)
+- Can use SDK for data
+- Compose UI components
+- Handle loading/error states
+
+## Design Tokens
+
+All styling uses CSS variables defined in `styles/tokens.css`:
+
+```css
+:root {
+  /* Colors */
+  --color-primary: #...;
+  --color-surface: #...;
+  
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  
+  /* Typography */
+  --font-sans: '...';
+  --text-sm: 0.875rem;
+}
+```
+
+## Anti-patterns to Avoid
+
+1. **NO** direct database imports or Prisma/Drizzle usage
+2. **NO** raw fetch calls to backend (use SDK)
+3. **NO** business logic in components (belongs in backend)
+4. **NO** storing sensitive data in localStorage
+5. **NO** bypassing Auth.js for authentication
+6. **NO** API routes that proxy to database (all data through backend)

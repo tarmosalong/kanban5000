@@ -1,0 +1,10 @@
+{
+  "databaseUrl": {"ENV": "DATABASE_URL"},
+  "migrationsTable": "pgmigrations",
+  "dir": "migrations",
+  "direction": "up",
+  "count": "Infinity",
+  "timestamp": false,
+  "verbose": true
+}
+

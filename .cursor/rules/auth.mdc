@@ -1,0 +1,297 @@
+# Authentication Architecture Rules
+
+## Core Principle: Backend Owns Identity
+
+Auth.js (NextAuth) is a **transport layer only**. It handles:
+- OAuth flows (GitHub, Google, etc.)
+- Session cookies
+- CSRF protection
+
+The backend owns:
+- User records
+- Roles and permissions
+- JWT issuance
+- Authorization checks
+
+## Authentication Flow
+
+```
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Auth.js      │     │    Backend      │     │   PostgreSQL    │
+│   (Next.js)     │     │    API          │     │                 │
+└────────┬────────┘     └────────┬────────┘     └────────┬────────┘
+         │                       │                       │
+         │  1. OAuth callback    │                       │
+         │  (user authenticated) │                       │
+         │                       │                       │
+         │  2. POST /auth/sync   │                       │
+         │──────────────────────▶│                       │
+         │  { provider, email,   │  3. Upsert user      │
+         │    providerAccountId }│──────────────────────▶│
+         │                       │                       │
+         │                       │  4. User record       │
+         │                       │◀──────────────────────│
+         │                       │                       │
+         │  5. { token: JWT }    │                       │
+         │◀──────────────────────│                       │
+         │                       │                       │
+         │  6. Store in session  │                       │
+         │                       │                       │
+```
+
+## Auth.js Configuration
+
+```typescript
+// packages/frontend/lib/auth.ts
+import NextAuth from 'next-auth';
+import GitHub from 'next-auth/providers/github';
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  providers: [GitHub],
+  callbacks: {
+    async signIn({ user, account }) {
+      // Sync to backend, get JWT
+      const res = await fetch(`${process.env.BACKEND_URL}/auth/sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: account?.provider,
+          providerAccountId: account?.providerAccountId,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        }),
+      });
+      
+      if (!res.ok) return false;
+      
+      const { token } = await res.json();
+      (user as any).backendToken = token;
+      return true;
+    },
+    async jwt({ token, user }) {
+      if (user) {
+        token.backendToken = (user as any).backendToken;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      (session as any).backendToken = token.backendToken;
+      return session;
+    },
+  },
+});
+```
+
+## Backend Auth Module
+
+### User Model
+
+```typescript
+// modules/auth/auth.types.ts
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  image: string | null;
+  provider: string;
+  providerAccountId: string;
+  roles: Role[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  permissions: Permission[];
+}
+
+export interface Permission {
+  id: string;
+  action: string;      // 'create', 'read', 'update', 'delete'
+  resource: string;    // 'workspace', 'issue', '*'
+  scope: string | null; // workspace_id or null for global
+}
+```
+
+### Auth Service
+
+```typescript
+// modules/auth/auth.service.ts
+export class AuthService implements IAuthService {
+  constructor(
+    private userRepository: IUserRepository,
+    private jwtService: IJwtService,
+  ) {}
+
+  async syncFromOAuth(profile: OAuthProfile): Promise<{ token: string }> {
+    // Upsert user
+    let user = await this.userRepository.findByProvider(
+      profile.provider,
+      profile.providerAccountId
+    );
+
+    if (!user) {
+      user = await this.userRepository.create({
+        email: profile.email,
+        name: profile.name,
+        image: profile.image,
+        provider: profile.provider,
+        providerAccountId: profile.providerAccountId,
+      });
+    }
+
+    // Issue JWT
+    const token = await this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      roles: user.roles.map(r => r.name),
+    });
+
+    return { token };
+  }
+
+  async can(userId: string, action: string, resource: string, scope?: string): Promise<boolean> {
+    const user = await this.userRepository.findByIdWithPermissions(userId);
+    if (!user) return false;
+
+    return user.roles.some(role =>
+      role.permissions.some(p =>
+        (p.action === action || p.action === '*') &&
+        (p.resource === resource || p.resource === '*') &&
+        (p.scope === null || p.scope === scope)
+      )
+    );
+  }
+}
+```
+
+### Auth Middleware
+
+```typescript
+// modules/auth/auth.middleware.ts
+export function requireAuth(): Middleware {
+  return async (req, next) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      throw new UnauthorizedError('Missing authentication token');
+    }
+
+    try {
+      const payload = await jwtService.verify(token);
+      req.user = {
+        id: payload.sub,
+        email: payload.email,
+        roles: payload.roles,
+      };
+      return next();
+    } catch {
+      throw new UnauthorizedError('Invalid authentication token');
+    }
+  };
+}
+
+export function requirePermission(action: string, resource: string): Middleware {
+  return async (req, next) => {
+    if (!req.user) {
+      throw new UnauthorizedError('Not authenticated');
+    }
+
+    const canDo = await authService.can(req.user.id, action, resource);
+    if (!canDo) {
+      throw new ForbiddenError(`Missing permission: ${action}:${resource}`);
+    }
+
+    return next();
+  };
+}
+```
+
+## JWT Structure
+
+```typescript
+interface JwtPayload {
+  sub: string;        // User ID
+  email: string;
+  roles: string[];    // Role names for quick checks
+  iat: number;        // Issued at
+  exp: number;        // Expiration (short-lived, e.g., 15min)
+}
+```
+
+## Permission Checks in Services
+
+```typescript
+// modules/workspace/workspace.service.ts
+export class WorkspaceService {
+  async update(userId: string, workspaceId: string, data: UpdateWorkspace) {
+    // Check permission with scope
+    const canUpdate = await this.authService.can(
+      userId, 
+      'update', 
+      'workspace', 
+      workspaceId
+    );
+    
+    if (!canUpdate) {
+      throw new ForbiddenError('Cannot update this workspace');
+    }
+
+    return this.workspaceRepository.update(workspaceId, data);
+  }
+}
+```
+
+## Database Schema
+
+```sql
+-- Users
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  image TEXT,
+  provider TEXT NOT NULL,
+  provider_account_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (provider, provider_account_id)
+);
+
+-- Roles
+CREATE TABLE roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- User-Role mapping
+CREATE TABLE user_roles (
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, role_id)
+);
+
+-- Permissions
+CREATE TABLE permissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  role_id UUID NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+  action TEXT NOT NULL,       -- 'create', 'read', 'update', 'delete', '*'
+  resource TEXT NOT NULL,     -- 'workspace', 'issue', '*'
+  scope TEXT,                 -- NULL for global, workspace_id for scoped
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_permissions_role ON permissions (role_id);
+CREATE INDEX idx_user_roles_user ON user_roles (user_id);
+```
+
+## Anti-patterns to Avoid
+
+1. **NO** storing user data only in Auth.js session
+2. **NO** permission checks in frontend (backend is authoritative)
+3. **NO** long-lived JWTs (use refresh tokens if needed)
+4. **NO** role checks by name in services (use permission system)
+5. **NO** bypassing auth middleware for "internal" routes
