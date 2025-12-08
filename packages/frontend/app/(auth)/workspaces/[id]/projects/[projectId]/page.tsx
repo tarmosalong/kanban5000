@@ -107,6 +107,27 @@ export default function ProjectPage() {
     [fetchData]
   );
 
+  const handleQuickCreate = useCallback(
+    async (title: string, statusId: string) => {
+      const res = await fetch(`/api/projects/${projectId}/issues`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title, 
+          statusId,
+          priority: 'medium',
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to create issue');
+      }
+
+      await fetchData();
+    },
+    [projectId, fetchData]
+  );
+
   // Get unique assignees from issues
   const assignees = useMemo(() => {
     const uniqueAssignees = new Map<string, { id: string; name: string; email: string; image?: string }>();
@@ -389,6 +410,7 @@ export default function ProjectPage() {
                 workspaceId={workspaceId}
                 projectId={projectId}
                 onIssueMove={handleIssueMove}
+                onQuickCreate={handleQuickCreate}
               />
             </div>
           </div>

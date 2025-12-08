@@ -60,6 +60,7 @@ interface KanbanBoardProps {
   workspaceId: string;
   projectId: string;
   onIssueMove: (issueId: string, newStatusId: string) => Promise<void>;
+  onQuickCreate?: (title: string, statusId: string) => Promise<void>;
 }
 
 export function KanbanBoard({
@@ -68,6 +69,7 @@ export function KanbanBoard({
   workspaceId,
   projectId,
   onIssueMove,
+  onQuickCreate,
 }: KanbanBoardProps) {
   const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
   const [localIssues, setLocalIssues] = useState(issues);
@@ -195,6 +197,7 @@ export function KanbanBoard({
             title={status.name}
             color={status.color}
             count={issuesByStatus[status.id]?.length || 0}
+            onQuickCreate={onQuickCreate}
           >
             <SortableContext
               items={issuesByStatus[status.id]?.map((i) => i.id) || []}
