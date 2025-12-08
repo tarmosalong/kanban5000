@@ -639,11 +639,19 @@ export default function IssuePage() {
                                 {' '}from <span className="text-slate-400">
                                   {entry.fieldName === 'status' 
                                     ? statuses.find(s => s.id === entry.oldValue)?.name || entry.oldValue
+                                    : entry.fieldName === 'assignee'
+                                    ? members.find(m => m.user.id === entry.oldValue)?.user.name || 
+                                      members.find(m => m.user.id === entry.oldValue)?.user.email || 
+                                      'Unassigned'
                                     : entry.oldValue}
                                 </span>
                                 {' '}to <span className="text-white">
                                   {entry.fieldName === 'status' 
                                     ? statuses.find(s => s.id === entry.newValue)?.name || entry.newValue
+                                    : entry.fieldName === 'assignee'
+                                    ? members.find(m => m.user.id === entry.newValue)?.user.name || 
+                                      members.find(m => m.user.id === entry.newValue)?.user.email || 
+                                      'Unassigned'
                                     : entry.newValue}
                                 </span>
                               </>

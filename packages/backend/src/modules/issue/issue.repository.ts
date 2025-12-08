@@ -26,6 +26,7 @@ export interface IIssueRepository {
   create(projectId: string, userId: string, input: CreateIssueInput, defaultStatusId: string): Promise<Issue>;
   update(id: string, userId: string, input: UpdateIssueInput): Promise<Issue>;
   delete(id: string): Promise<void>;
+  reorderIssue(issueId: string, statusId: string, newPosition: number): Promise<void>;
   
   // Comments
   getComments(issueId: string): Promise<CommentWithAuthor[]>;
@@ -76,6 +77,7 @@ export class IssueRepository implements IIssueRepository {
         'issues.created_by',
         'issues.assigned_to',
         'issues.due_date',
+        'issues.position',
         'issues.estimated_hours',
         'issues.custom_fields',
         'issues.created_at',
@@ -137,6 +139,7 @@ export class IssueRepository implements IIssueRepository {
         'issues.created_by',
         'issues.assigned_to',
         'issues.due_date',
+        'issues.position',
         'issues.estimated_hours',
         'issues.custom_fields',
         'issues.created_at',
@@ -555,6 +558,7 @@ export class IssueRepository implements IIssueRepository {
       created_by: string;
       assigned_to: string | null;
       due_date: Date | null;
+      position: number;
       estimated_hours: number | null;
       custom_fields: unknown;
       created_at: Date;
@@ -574,6 +578,7 @@ export class IssueRepository implements IIssueRepository {
       createdBy: row.created_by,
       assignedTo: row.assigned_to,
       dueDate: row.due_date,
+      position: row.position ?? 0,
       estimatedHours: row.estimated_hours ? Number(row.estimated_hours) : null,
       customFields: (typeof row.custom_fields === 'string'
         ? JSON.parse(row.custom_fields)
@@ -601,6 +606,7 @@ export class IssueRepository implements IIssueRepository {
       createdBy: row.created_by,
       assignedTo: row.assigned_to,
       dueDate: row.due_date,
+      position: row.position ?? 0,
       estimatedHours: row.estimated_hours ? Number(row.estimated_hours) : null,
       customFields: (typeof row.custom_fields === 'string'
         ? JSON.parse(row.custom_fields)
@@ -629,6 +635,78 @@ export class IssueRepository implements IIssueRepository {
         : undefined,
       labelDetails,
     };
+  }
+
+  /**
+   * Reorder an issue within or across columns.
+   */
+  async reorderIssue(issueId: string, statusId: string, newPosition: number): Promise<void> {
+    const issue = await this.findById(issueId);
+    if (!issue) throw new Error('Issue not found');
+
+    const oldStatusId = issue.statusId;
+    const oldPosition = issue.position;
+
+    // If moving to a different status
+    if (oldStatusId !== statusId) {
+      // Shift down issues in old column (those after the moved issue)
+      await this.db
+        .updateTable('issues')
+        .set({ position: sql`position - 1` })
+        .where('status_id', '=', oldStatusId)
+        .where('position', '>', oldPosition)
+        .execute();
+
+      // Shift up issues in new column to make room
+      await this.db
+        .updateTable('issues')
+        .set({ position: sql`position + 1` })
+        .where('status_id', '=', statusId)
+        .where('position', '>=', newPosition)
+        .execute();
+
+      // Update the issue with new status and position
+      await this.db
+        .updateTable('issues')
+        .set({
+          status_id: statusId,
+          position: newPosition,
+          updated_at: new Date(),
+        })
+        .where('id', '=', issueId)
+        .execute();
+    } else {
+      // Moving within the same column
+      if (newPosition > oldPosition) {
+        // Moving down - shift others up
+        await this.db
+          .updateTable('issues')
+          .set({ position: sql`position - 1` })
+          .where('status_id', '=', statusId)
+          .where('position', '>', oldPosition)
+          .where('position', '<=', newPosition)
+          .execute();
+      } else if (newPosition < oldPosition) {
+        // Moving up - shift others down
+        await this.db
+          .updateTable('issues')
+          .set({ position: sql`position + 1` })
+          .where('status_id', '=', statusId)
+          .where('position', '>=', newPosition)
+          .where('position', '<', oldPosition)
+          .execute();
+      }
+
+      // Update the issue position
+      await this.db
+        .updateTable('issues')
+        .set({
+          position: newPosition,
+          updated_at: new Date(),
+        })
+        .where('id', '=', issueId)
+        .execute();
+    }
   }
 }
 

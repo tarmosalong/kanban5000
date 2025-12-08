@@ -20,6 +20,7 @@ const IssueSchema = z.object({
   createdBy: z.string().uuid(),
   assignedTo: z.string().uuid().nullable(),
   dueDate: z.coerce.date().nullable(),
+  position: z.number(),
   estimatedHours: z.number().nullable(),
   customFields: z.record(z.unknown()),
   labels: z.array(z.string().uuid()),
@@ -134,6 +135,11 @@ const SearchQuerySchema = z.object({
   q: z.string().min(1),
 });
 
+const ReorderIssueSchema = z.object({
+  statusId: z.string().uuid(),
+  position: z.number().int().nonnegative(),
+});
+
 /**
  * Create issue routes.
  */
@@ -221,6 +227,20 @@ export function createIssueRoutes(controller: IssueController): RouteDefinition[
         operationId: 'deleteIssue',
       })
       .handler((req) => controller.delete(req)),
+
+    route
+      .post('/issues/:id/reorder')
+      .params(IdParamsSchema)
+      .body(ReorderIssueSchema)
+      .response(z.object({ success: z.boolean() }))
+      .use(requireAuth())
+      .meta({
+        summary: 'Reorder issue',
+        description: 'Reorder an issue within or across status columns',
+        tags: ['Issues'],
+        operationId: 'reorderIssue',
+      })
+      .handler((req) => controller.reorder(req)),
 
     // Comments
     route

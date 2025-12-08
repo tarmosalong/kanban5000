@@ -1,28 +1,20 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   DndContext,
   DragOverlay,
-  KeyboardSensor,
+  DragStartEvent,
+  DragEndEvent,
+  DragOverEvent,
+  closestCorners,
   PointerSensor,
   useSensor,
   useSensors,
-  rectIntersection,
-  type DragStartEvent,
-  type DragEndEvent,
-  type DragOverEvent,
-  type CollisionDetection,
-  pointerWithin,
-  getFirstCollision,
+  useDroppable,
+  useDraggable,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
 
-import { KanbanColumn } from './kanban-column';
-import { KanbanCard } from './kanban-card';
 import { IssueCard } from './issue-card';
 
 export interface IssueStatus {
@@ -38,6 +30,7 @@ export interface Issue {
   title: string;
   description: string | null;
   priority: 'low' | 'medium' | 'high' | 'urgent';
+  position: number;
   status: {
     id: string;
     name: string;
@@ -58,13 +51,149 @@ export interface Issue {
   createdAt: string;
 }
 
+interface Column {
+  id: string;
+  name: string;
+  color: string;
+  issues: Issue[];
+}
+
 interface KanbanBoardProps {
   statuses: IssueStatus[];
   issues: Issue[];
   workspaceId: string;
   projectId: string;
-  onIssueMove: (issueId: string, newStatusId: string) => Promise<void>;
+  onIssueMove: (issueId: string, newStatusId: string, position: number) => Promise<void>;
   onQuickCreate?: (title: string, statusId: string) => Promise<void>;
+}
+
+// Draggable issue card
+function DraggableIssue({ 
+  issue, 
+  workspaceId, 
+  projectId, 
+  isDragging 
+}: { 
+  issue: Issue; 
+  workspaceId: string; 
+  projectId: string;
+  isDragging: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: issue.id });
+
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-40' : ''}`}
+    >
+      <IssueCard issue={issue} workspaceId={workspaceId} projectId={projectId} />
+    </div>
+  );
+}
+
+// Droppable zone for each issue (for reordering)
+function DroppableIssueZone({ issueId, children }: { issueId: string; children: React.ReactNode }) {
+  const { setNodeRef } = useDroppable({ id: issueId });
+
+  return (
+    <div ref={setNodeRef}>
+      {children}
+    </div>
+  );
+}
+
+// Droppable column
+function DroppableColumn({ 
+  columnId, 
+  children, 
+  isActive,
+  issueCount,
+}: { 
+  columnId: string; 
+  children: React.ReactNode; 
+  isActive: boolean;
+  issueCount: number;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: `column:${columnId}` });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex-1 p-2 space-y-2 overflow-y-auto min-h-[100px] rounded-lg transition-colors ${
+        isOver || isActive ? 'bg-primary-500/10' : ''
+      }`}
+    >
+      {children}
+      {/* Bottom drop zone */}
+      <BottomDropZone columnId={columnId} index={issueCount} />
+    </div>
+  );
+}
+
+// Drop zone at bottom of column for "add to end"
+function BottomDropZone({ columnId, index }: { columnId: string; index: number }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `bottom:${columnId}:${index}` });
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      className={`min-h-[40px] rounded-lg transition-colors ${
+        isOver ? 'bg-primary-500/20 border-2 border-dashed border-primary-500/50' : ''
+      }`}
+    />
+  );
+}
+
+// Placeholder card shown during drag - matches IssueCard structure
+function PlaceholderCard({ issue }: { issue: Issue }) {
+  return (
+    <div className="rounded-lg border-2 border-dashed border-primary-500/50 bg-primary-500/10 p-3">
+      {/* Priority indicator line */}
+      <div className="absolute top-0 left-0 w-full h-0.5 opacity-30 bg-primary-400" />
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-primary-400/60 text-xs font-mono">#{issue.number}</span>
+      </div>
+
+      {/* Title */}
+      <div className="text-[13px] font-medium text-primary-300 leading-snug line-clamp-2 mb-2">
+        {issue.title}
+      </div>
+
+      {/* Labels placeholder */}
+      {issue.labelDetails.length > 0 && (
+        <div className="flex gap-1 mb-2.5">
+          {issue.labelDetails.slice(0, 2).map((label) => (
+            <span key={label.id} className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-400">
+              {label.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Footer placeholder */}
+      <div className="flex items-center justify-between pt-2 border-t border-primary-500/20">
+        {issue.assignee ? (
+          <div className="flex items-center gap-1.5">
+            <div className="w-5 h-5 rounded-full bg-primary-500/30" />
+            <span className="text-[11px] text-primary-400/60">
+              {issue.assignee.name?.split(' ')[0] || '...'}
+            </span>
+          </div>
+        ) : (
+          <span className="text-[11px] text-primary-400/40 italic">Unassigned</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function KanbanBoard({
@@ -75,195 +204,386 @@ export function KanbanBoard({
   onIssueMove,
   onQuickCreate,
 }: KanbanBoardProps) {
-  const [activeIssue, setActiveIssue] = useState<Issue | null>(null);
-  const [localIssues, setLocalIssues] = useState(issues);
+  const [mounted, setMounted] = useState(false);
+  
+  // Build columns from statuses and issues
+  const buildColumns = (): Column[] => {
+    return statuses.map(status => ({
+      id: status.id,
+      name: status.name,
+      color: status.color,
+      issues: issues
+        .filter(i => i.status.id === status.id)
+        .sort((a, b) => a.position - b.position),
+    }));
+  };
+  
+  const [columns, setColumns] = useState<Column[]>(buildColumns);
 
-  // Sync local state when issues prop changes
-  useMemo(() => {
-    setLocalIssues(issues);
-  }, [issues]);
+  // Drag state
+  const [dragState, setDragState] = useState<{
+    activeId: string | null;
+    activeColumnId: string | null;
+    overColumnId: string | null;
+    overIndex: number;
+  }>({ activeId: null, activeColumnId: null, overColumnId: null, overIndex: 0 });
 
-  // Group issues by status
-  const issuesByStatus = useMemo(() => {
-    const grouped: Record<string, Issue[]> = {};
-    statuses.forEach((status) => {
-      grouped[status.id] = localIssues.filter(
-        (issue) => issue.status.id === status.id
-      );
-    });
-    return grouped;
-  }, [localIssues, statuses]);
+  const lastOverRef = useRef<string | null>(null);
 
-  // All status IDs for collision detection
-  const statusIds = useMemo(() => statuses.map(s => s.id), [statuses]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Sync columns when issues prop changes
+  useEffect(() => {
+    setColumns(buildColumns());
+  }, [issues, statuses]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor)
+      activationConstraint: { distance: 5 },
+    })
   );
 
-  // Custom collision detection that prioritizes columns for empty drops
-  const collisionDetection: CollisionDetection = useCallback((args) => {
-    // First check for pointer within droppable areas (columns)
-    const pointerCollisions = pointerWithin(args);
-    
-    // If pointer is within a column, use that
-    const columnCollision = pointerCollisions.find(c => statusIds.includes(c.id as string));
-    if (columnCollision) {
-      return [columnCollision];
+  function getIssue(issueId: string): Issue | null {
+    for (const col of columns) {
+      const issue = col.issues.find(i => i.id === issueId);
+      if (issue) return issue;
     }
-    
-    // Fall back to rect intersection for items
-    const rectCollisions = rectIntersection(args);
-    if (rectCollisions.length > 0) {
-      return rectCollisions;
+    return null;
+  }
+
+  function getColumnId(issueId: string): string | null {
+    for (const col of columns) {
+      if (col.issues.some(i => i.id === issueId)) return col.id;
     }
-    
-    // If no collision, return pointer collisions
-    return pointerCollisions;
-  }, [statusIds]);
+    return null;
+  }
 
   function handleDragStart(event: DragStartEvent) {
-    const { active } = event;
-    const issue = localIssues.find((i) => i.id === active.id);
-    if (issue) {
-      setActiveIssue(issue);
-      document.body.style.cursor = 'grabbing';
-    }
+    const issueId = String(event.active.id);
+    const columnId = getColumnId(issueId);
+    const column = columns.find(c => c.id === columnId);
+    const index = column?.issues.findIndex(i => i.id === issueId) ?? 0;
+
+    setDragState({
+      activeId: issueId,
+      activeColumnId: columnId,
+      overColumnId: columnId,
+      overIndex: index,
+    });
+    lastOverRef.current = null;
+    document.body.style.cursor = 'grabbing';
   }
 
   function handleDragOver(event: DragOverEvent) {
-    const { active, over } = event;
-    if (!over) return;
+    const { over } = event;
 
-    const activeIssueId = active.id as string;
-    const overId = over.id as string;
+    if (!over || !dragState.activeId) return;
 
-    const overStatus = statuses.find((s) => s.id === overId);
-    const overIssue = localIssues.find((i) => i.id === overId);
+    const overId = String(over.id);
 
-    const activeIssue = localIssues.find((i) => i.id === activeIssueId);
-    if (!activeIssue) return;
+    // Skip duplicate events
+    if (lastOverRef.current === overId) return;
+    lastOverRef.current = overId;
 
-    let newStatusId: string | null = null;
+    let targetColumnId: string;
+    let targetIndex: number;
 
-    if (overStatus) {
-      newStatusId = overStatus.id;
-    } else if (overIssue) {
-      newStatusId = overIssue.status.id;
+    if (overId.startsWith('bottom:')) {
+      // Dropping at bottom of column
+      const parts = overId.split(':');
+      targetColumnId = parts[1];
+      targetIndex = parseInt(parts[2], 10);
+    } else if (overId.startsWith('column:')) {
+      // Dropping on column (empty area)
+      targetColumnId = overId.replace('column:', '');
+      const column = columns.find(c => c.id === targetColumnId);
+      targetIndex = column ? column.issues.length : 0;
+    } else {
+      // Dropping on another issue
+      const columnId = getColumnId(overId);
+      if (!columnId) return;
+      targetColumnId = columnId;
+      const column = columns.find(c => c.id === columnId);
+      targetIndex = column?.issues.findIndex(i => i.id === overId) ?? 0;
     }
 
-    if (newStatusId && newStatusId !== activeIssue.status.id) {
-      setLocalIssues((prev) =>
-        prev.map((issue) =>
-          issue.id === activeIssueId
-            ? {
-                ...issue,
-                status: {
-                  ...issue.status,
-                  id: newStatusId!,
-                  name: statuses.find((s) => s.id === newStatusId)?.name || issue.status.name,
-                  color: statuses.find((s) => s.id === newStatusId)?.color || issue.status.color,
-                },
-              }
-            : issue
-        )
-      );
+    if (dragState.overColumnId !== targetColumnId || dragState.overIndex !== targetIndex) {
+      setDragState(prev => ({
+        ...prev,
+        overColumnId: targetColumnId,
+        overIndex: targetIndex,
+      }));
     }
   }
 
-  async function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    setActiveIssue(null);
+  async function handleDragEnd() {
+    const { activeId, activeColumnId, overColumnId, overIndex } = dragState;
+
+    setDragState({ activeId: null, activeColumnId: null, overColumnId: null, overIndex: 0 });
+    lastOverRef.current = null;
     document.body.style.cursor = '';
 
-    if (!over) return;
+    if (!activeId || !activeColumnId || !overColumnId) return;
 
-    const activeIssueId = active.id as string;
-    const overId = over.id as string;
+    const activeIssue = getIssue(activeId);
+    if (!activeIssue) return;
 
-    const overStatus = statuses.find((s) => s.id === overId);
-    const overIssue = localIssues.find((i) => i.id === overId);
-
-    let targetStatusId: string | null = null;
-
-    if (overStatus) {
-      targetStatusId = overStatus.id;
-    } else if (overIssue) {
-      targetStatusId = overIssue.status.id;
+    // Calculate the actual new position
+    let newPosition = overIndex;
+    
+    // If moving within same column, adjust for the removed item
+    if (activeColumnId === overColumnId) {
+      const column = columns.find(c => c.id === activeColumnId);
+      const currentIndex = column?.issues.findIndex(i => i.id === activeId) ?? 0;
+      if (overIndex > currentIndex) {
+        newPosition = overIndex - 1;
+      }
     }
 
-    if (targetStatusId) {
-      const activeIssue = issues.find((i) => i.id === activeIssueId);
-      if (activeIssue && activeIssue.status.id !== targetStatusId) {
-        try {
-          await onIssueMove(activeIssueId, targetStatusId);
-        } catch (error) {
-          setLocalIssues(issues);
+    // Optimistic update
+    let newColumns: Column[];
+
+    if (activeColumnId === overColumnId) {
+      // Reorder within same column
+      newColumns = columns.map(col => {
+        if (col.id !== activeColumnId) return col;
+
+        const issues = [...col.issues];
+        const currentIndex = issues.findIndex(i => i.id === activeId);
+        if (currentIndex === -1) return col;
+
+        const [removed] = issues.splice(currentIndex, 1);
+        const insertIndex = overIndex > currentIndex ? overIndex - 1 : overIndex;
+        issues.splice(Math.max(0, Math.min(insertIndex, issues.length)), 0, removed);
+
+        return { ...col, issues };
+      });
+    } else {
+      // Move to different column
+      const targetStatus = statuses.find(s => s.id === overColumnId);
+      if (!targetStatus) return;
+
+      newColumns = columns.map(col => {
+        if (col.id === activeColumnId) {
+          return { ...col, issues: col.issues.filter(i => i.id !== activeId) };
+        }
+        if (col.id === overColumnId) {
+          const issues = [...col.issues];
+          const movedIssue = {
+            ...activeIssue,
+            status: { id: targetStatus.id, name: targetStatus.name, color: targetStatus.color },
+          };
+          issues.splice(Math.min(overIndex, issues.length), 0, movedIssue);
+          return { ...col, issues };
+        }
+        return col;
+      });
+    }
+
+    setColumns(newColumns);
+
+    // Persist to backend
+    try {
+      await onIssueMove(activeId, overColumnId, newPosition);
+    } catch (error) {
+      // Revert on error
+      setColumns(buildColumns());
+    }
+  }
+
+  function handleDragCancel() {
+    setDragState({ activeId: null, activeColumnId: null, overColumnId: null, overIndex: 0 });
+    lastOverRef.current = null;
+    document.body.style.cursor = '';
+  }
+
+  const draggedIssue = dragState.activeId ? getIssue(dragState.activeId) : null;
+
+  // Render issues with placeholder
+  function renderIssues(column: Column) {
+    const { activeId, activeColumnId, overColumnId, overIndex } = dragState;
+    const isSourceColumn = activeColumnId === column.id;
+    const isTargetColumn = overColumnId === column.id;
+    const activeIssue = activeId ? getIssue(activeId) : null;
+
+    if (!isTargetColumn || !activeIssue) {
+      // No dragging to this column - just render normally
+      return column.issues.map((issue) => (
+        <DroppableIssueZone key={issue.id} issueId={issue.id}>
+          <DraggableIssue
+            issue={issue}
+            workspaceId={workspaceId}
+            projectId={projectId}
+            isDragging={issue.id === activeId}
+          />
+        </DroppableIssueZone>
+      ));
+    }
+
+    const items: React.ReactNode[] = [];
+    const currentIndex = isSourceColumn 
+      ? column.issues.findIndex(i => i.id === activeId) 
+      : -1;
+
+    // For same column: calculate effective index without the dragged item
+    // For different column: just use overIndex directly
+    let placeholderInserted = false;
+
+    column.issues.forEach((issue, index) => {
+      const isDragging = issue.id === activeId;
+
+      // Calculate the visual index (excluding dragged item for same column)
+      let visualIndex = index;
+      if (isSourceColumn && currentIndex !== -1 && index > currentIndex) {
+        visualIndex = index - 1;
+      }
+
+      // Insert placeholder at the right position
+      if (!placeholderInserted) {
+        if (isSourceColumn) {
+          // Same column - show placeholder at target position
+          // Account for the fact that dragged item is still in array
+          const targetVisualIndex = overIndex > currentIndex ? overIndex - 1 : overIndex;
+          if (!isDragging && visualIndex === targetVisualIndex && currentIndex !== overIndex) {
+            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
+            placeholderInserted = true;
+          }
+        } else {
+          // Different column - insert at overIndex
+          if (index === overIndex) {
+            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
+            placeholderInserted = true;
+          }
+        }
+      }
+
+      items.push(
+        <DroppableIssueZone key={issue.id} issueId={issue.id}>
+          <DraggableIssue
+            issue={issue}
+            workspaceId={workspaceId}
+            projectId={projectId}
+            isDragging={isDragging}
+          />
+        </DroppableIssueZone>
+      );
+    });
+
+    // Placeholder at end if not yet inserted
+    if (!placeholderInserted && isTargetColumn) {
+      if (isSourceColumn) {
+        // Same column, moving to end
+        const effectiveLength = column.issues.length - 1; // exclude dragged item
+        if (overIndex >= column.issues.length || (overIndex > currentIndex && overIndex >= effectiveLength)) {
+          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
+        }
+      } else {
+        // Different column, at end
+        if (overIndex >= column.issues.length) {
+          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
         }
       }
     }
+
+    return items;
+  }
+
+  if (!mounted) {
+    return (
+      <div className="flex gap-3 h-full">
+        {columns.map((column) => (
+          <div key={column.id} className="flex flex-col flex-shrink-0 w-72 rounded-xl bg-white/[0.02]">
+            <div className="flex items-center gap-2.5 px-3 py-3 border-b border-white/[0.06]">
+              <div
+                className="w-2.5 h-2.5 rounded-full ring-2 ring-offset-1 ring-offset-transparent"
+                style={{ backgroundColor: column.color, boxShadow: `0 0 8px ${column.color}50` }}
+              />
+              <span className="font-medium text-sm text-slate-200">{column.name}</span>
+              <span className="text-xs text-slate-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">
+                {column.issues.length}
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
+              {column.issues.map((issue) => (
+                <IssueCard key={issue.id} issue={issue} workspaceId={workspaceId} projectId={projectId} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={collisionDetection}
+      collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div className="flex gap-3 h-full">
-        {statuses.map((status) => (
-          <KanbanColumn
-            key={status.id}
-            id={status.id}
-            title={status.name}
-            color={status.color}
-            count={issuesByStatus[status.id]?.length || 0}
-            onQuickCreate={onQuickCreate}
-          >
-            <SortableContext
-              items={issuesByStatus[status.id]?.map((i) => i.id) || []}
-              strategy={verticalListSortingStrategy}
+        {columns.map((column) => {
+          const isActive = dragState.overColumnId === column.id;
+
+          return (
+            <div
+              key={column.id}
+              className={`flex flex-col flex-shrink-0 w-72 rounded-xl transition-all ${
+                isActive ? 'bg-primary-500/5 ring-1 ring-primary-500/30' : 'bg-white/[0.02]'
+              }`}
             >
-              {issuesByStatus[status.id]?.map((issue) => (
-                <KanbanCard key={issue.id} id={issue.id}>
-                  <IssueCard
-                    issue={issue}
-                    workspaceId={workspaceId}
-                    projectId={projectId}
-                  />
-                </KanbanCard>
-              ))}
-              {issuesByStatus[status.id]?.length === 0 && (
-                <div className="flex items-center justify-center h-24 text-xs text-slate-500 border border-dashed border-white/10 rounded-lg bg-white/[0.02]">
-                  Drop issues here
-                </div>
-              )}
-            </SortableContext>
-          </KanbanColumn>
-        ))}
+              {/* Column Header */}
+              <div className="flex items-center gap-2.5 px-3 py-3 border-b border-white/[0.06]">
+                <div
+                  className="w-2.5 h-2.5 rounded-full ring-2 ring-offset-1 ring-offset-transparent"
+                  style={{ backgroundColor: column.color, boxShadow: `0 0 8px ${column.color}50` }}
+                />
+                <span className="font-medium text-sm text-slate-200">{column.name}</span>
+                <span className="text-xs text-slate-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">
+                  {column.issues.length}
+                </span>
+
+                {/* Quick Add Button */}
+                {onQuickCreate && (
+                  <button
+                    onClick={() => {
+                      const title = prompt('Issue title:');
+                      if (title) onQuickCreate(title, column.id);
+                    }}
+                    className="ml-auto p-1 text-slate-500 hover:text-white hover:bg-white/10 rounded transition-colors"
+                    title="Quick add issue"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              <DroppableColumn columnId={column.id} isActive={isActive} issueCount={column.issues.length}>
+                {renderIssues(column)}
+
+                {column.issues.length === 0 && !dragState.activeId && (
+                  <div className="flex items-center justify-center h-24 text-xs text-slate-500 border border-dashed border-white/10 rounded-lg bg-white/[0.02]">
+                    Drop issues here
+                  </div>
+                )}
+              </DroppableColumn>
+            </div>
+          );
+        })}
       </div>
 
-      <DragOverlay dropAnimation={{
-        duration: 200,
-        easing: 'cubic-bezier(0.18, 0.67, 0.6, 1.22)',
-      }}>
-        {activeIssue ? (
-          <div className="opacity-95">
-            <IssueCard
-              issue={activeIssue}
-              workspaceId={workspaceId}
-              projectId={projectId}
-              isDragging
-            />
+      <DragOverlay>
+        {draggedIssue && (
+          <div className="w-72 rotate-1 scale-105 shadow-2xl">
+            <IssueCard issue={draggedIssue} workspaceId={workspaceId} projectId={projectId} isDragging />
           </div>
-        ) : null}
+        )}
       </DragOverlay>
     </DndContext>
   );

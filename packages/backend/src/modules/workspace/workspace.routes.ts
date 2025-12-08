@@ -57,6 +57,41 @@ const WorkspaceMemberSchema = z.object({
   userId: z.string().uuid(),
   role: z.enum(['owner', 'admin', 'member', 'viewer']),
   joinedAt: z.coerce.date(),
+  user: z.object({
+    id: z.string().uuid(),
+    name: z.string().nullable(),
+    email: z.string().email(),
+    image: z.string().nullable(),
+  }),
+});
+
+const WorkspaceStatsSchema = z.object({
+  totalProjects: z.number(),
+  totalIssues: z.number(),
+  openIssues: z.number(),
+  closedIssues: z.number(),
+  issuesByPriority: z.array(z.object({
+    priority: z.string(),
+    count: z.number(),
+  })),
+  issuesByAssignee: z.array(z.object({
+    userId: z.string().uuid(),
+    userName: z.string().nullable(),
+    userEmail: z.string(),
+    count: z.number(),
+  })),
+  issuesByProject: z.array(z.object({
+    projectId: z.string().uuid(),
+    projectName: z.string(),
+    projectColor: z.string(),
+    count: z.number(),
+  })),
+  recentIssues: z.array(z.object({
+    id: z.string().uuid(),
+    title: z.string(),
+    projectName: z.string(),
+    createdAt: z.coerce.date(),
+  })),
 });
 
 /**
@@ -142,6 +177,19 @@ export function createWorkspaceRoutes(controller: WorkspaceController): RouteDef
         operationId: 'getWorkspaceMembers',
       })
       .handler((req) => controller.getMembers(req)),
+
+    route
+      .get('/workspaces/:id/stats')
+      .params(IdParamsSchema)
+      .response(WorkspaceStatsSchema)
+      .use(requireAuth())
+      .meta({
+        summary: 'Get workspace statistics',
+        description: 'Get aggregated statistics for a workspace',
+        tags: ['Workspaces'],
+        operationId: 'getWorkspaceStats',
+      })
+      .handler((req) => controller.getStats(req)),
   ];
 }
 

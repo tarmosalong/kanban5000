@@ -134,6 +134,7 @@ export interface IssuesTable {
   created_by: string;
   assigned_to: string | null;
   due_date: Date | null;
+  position: number;
   estimated_hours: number | null;
   custom_fields: unknown;
   search_vector: unknown;

@@ -44,7 +44,7 @@ const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   databaseUrl: process.env.DATABASE_URL || 'postgresql://kanban:kanban@localhost:5433/kanban5000',
   jwtSecret: process.env.JWT_SECRET || 'development-secret-change-in-production',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   nodeEnv: process.env.NODE_ENV || 'development',
 };
 

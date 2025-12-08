@@ -1,13 +1,13 @@
 import { NotFoundError, ForbiddenError, ConflictError } from '../../core/index.js';
 import type { IAuthService } from '../auth/index.js';
 
-import type { IWorkspaceRepository } from './workspace.repository.js';
+import type { IWorkspaceRepository, WorkspaceStats } from './workspace.repository.js';
 import type {
   Workspace,
   CreateWorkspaceInput,
   UpdateWorkspaceInput,
   WorkspaceFilters,
-  WorkspaceMember,
+  WorkspaceMemberWithUser,
 } from './workspace.types.js';
 
 /**
@@ -20,7 +20,8 @@ export interface IWorkspaceService {
   create(userId: string, input: CreateWorkspaceInput): Promise<Workspace>;
   update(userId: string, id: string, input: UpdateWorkspaceInput): Promise<Workspace>;
   delete(userId: string, id: string): Promise<void>;
-  getMembers(userId: string, workspaceId: string): Promise<WorkspaceMember[]>;
+  getMembers(userId: string, workspaceId: string): Promise<WorkspaceMemberWithUser[]>;
+  getStats(userId: string, workspaceId: string): Promise<WorkspaceStats>;
 }
 
 /**
@@ -115,10 +116,19 @@ export class WorkspaceService implements IWorkspaceService {
   /**
    * Get workspace members.
    */
-  async getMembers(userId: string, workspaceId: string): Promise<WorkspaceMember[]> {
+  async getMembers(userId: string, workspaceId: string): Promise<WorkspaceMemberWithUser[]> {
     // Verify access
     await this.findById(userId, workspaceId);
     return this.workspaceRepository.getMembers(workspaceId);
+  }
+
+  /**
+   * Get workspace statistics.
+   */
+  async getStats(userId: string, workspaceId: string): Promise<WorkspaceStats> {
+    // Verify access
+    await this.findById(userId, workspaceId);
+    return this.workspaceRepository.getStats(workspaceId);
   }
 
   /**

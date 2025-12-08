@@ -17,6 +17,7 @@ export interface Issue {
   createdBy: string;
   assignedTo: string | null;
   dueDate: Date | null;
+  position: number;
   estimatedHours: number | null;
   customFields: Record<string, unknown>;
   labels: string[]; // Label IDs
@@ -120,8 +121,18 @@ export interface UpdateIssueInput {
   priority?: IssuePriority;
   assignedTo?: string | null;
   dueDate?: Date | null;
+  position?: number;
   estimatedHours?: number | null;
   labels?: string[];
+}
+
+/**
+ * Reorder issues input.
+ */
+export interface ReorderIssuesInput {
+  issueId: string;
+  statusId: string;
+  position: number;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { NotFoundError, ForbiddenError, ConflictError } from '../../core/index.js';
 import type { IWorkspaceRepository } from '../workspace/index.js';
 
-import type { IProjectRepository } from './project.repository.js';
+import type { IProjectRepository, ProjectStats } from './project.repository.js';
 import type {
   Project,
   IssueStatus,
@@ -34,6 +34,9 @@ export interface IProjectService {
   getLabels(userId: string, projectId: string): Promise<Label[]>;
   createLabel(userId: string, projectId: string, input: CreateLabelInput): Promise<Label>;
   deleteLabel(userId: string, projectId: string, labelId: string): Promise<void>;
+  
+  // Statistics
+  getStats(userId: string, projectId: string): Promise<ProjectStats>;
 }
 
 /**
@@ -154,6 +157,13 @@ export class ProjectService implements IProjectService {
     await this.requireWorkspaceMember(userId, project.workspaceId, ['owner', 'admin']);
 
     await this.projectRepository.deleteLabel(labelId);
+  }
+
+  // Statistics
+
+  async getStats(userId: string, projectId: string): Promise<ProjectStats> {
+    await this.findById(userId, projectId);
+    return this.projectRepository.getStats(projectId);
   }
 
   // Private helpers

@@ -6,10 +6,22 @@ import type {
   Workspace,
   WorkspaceSettings,
   WorkspaceMember,
+  WorkspaceMemberWithUser,
   CreateWorkspaceInput,
   UpdateWorkspaceInput,
   WorkspaceFilters,
 } from './workspace.types.js';
+
+export interface WorkspaceStats {
+  totalProjects: number;
+  totalIssues: number;
+  openIssues: number;
+  closedIssues: number;
+  issuesByPriority: Array<{ priority: string; count: number }>;
+  issuesByAssignee: Array<{ userId: string; userName: string | null; userEmail: string; count: number }>;
+  issuesByProject: Array<{ projectId: string; projectName: string; projectColor: string; count: number }>;
+  recentIssues: Array<{ id: string; title: string; projectName: string; createdAt: Date }>;
+}
 
 /**
  * Repository interface for workspace data access.
@@ -24,7 +36,8 @@ export interface IWorkspaceRepository {
   addMember(workspaceId: string, userId: string, role: string): Promise<WorkspaceMember>;
   removeMember(workspaceId: string, userId: string): Promise<void>;
   getMember(workspaceId: string, userId: string): Promise<WorkspaceMember | null>;
-  getMembers(workspaceId: string): Promise<WorkspaceMember[]>;
+  getMembers(workspaceId: string): Promise<WorkspaceMemberWithUser[]>;
+  getStats(workspaceId: string): Promise<WorkspaceStats>;
 }
 
 /**
@@ -191,11 +204,21 @@ export class WorkspaceRepository implements IWorkspaceRepository {
     };
   }
 
-  async getMembers(workspaceId: string): Promise<WorkspaceMember[]> {
+  async getMembers(workspaceId: string): Promise<WorkspaceMemberWithUser[]> {
     const rows = await this.db
       .selectFrom('workspace_members')
-      .selectAll()
-      .where('workspace_id', '=', workspaceId)
+      .innerJoin('users', 'users.id', 'workspace_members.user_id')
+      .select([
+        'workspace_members.workspace_id',
+        'workspace_members.user_id',
+        'workspace_members.role',
+        'workspace_members.joined_at',
+        'users.id as user_id_dup',
+        'users.name as user_name',
+        'users.email as user_email',
+        'users.image as user_image',
+      ])
+      .where('workspace_members.workspace_id', '=', workspaceId)
       .execute();
 
     return rows.map((row) => ({
@@ -203,7 +226,134 @@ export class WorkspaceRepository implements IWorkspaceRepository {
       userId: row.user_id,
       role: row.role as WorkspaceMember['role'],
       joinedAt: row.joined_at,
+      user: {
+        id: row.user_id,
+        name: row.user_name,
+        email: row.user_email,
+        image: row.user_image,
+      },
     }));
+  }
+
+  async getStats(workspaceId: string): Promise<WorkspaceStats> {
+    // Total projects
+    const projectCountResult = await this.db
+      .selectFrom('projects')
+      .where('workspace_id', '=', workspaceId)
+      .select(({ fn }) => fn.count('id').as('count'))
+      .executeTakeFirst();
+    const totalProjects = Number(projectCountResult?.count ?? 0);
+
+    // Total issues (across all projects in workspace)
+    const totalIssuesResult = await this.db
+      .selectFrom('issues')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
+      .where('projects.workspace_id', '=', workspaceId)
+      .select(({ fn }) => fn.count('issues.id').as('count'))
+      .executeTakeFirst();
+    const totalIssues = Number(totalIssuesResult?.count ?? 0);
+
+    // Open issues
+    const openIssuesResult = await this.db
+      .selectFrom('issues')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
+      .where('projects.workspace_id', '=', workspaceId)
+      .where('issues.closed_at', 'is', null)
+      .select(({ fn }) => fn.count('issues.id').as('count'))
+      .executeTakeFirst();
+    const openIssues = Number(openIssuesResult?.count ?? 0);
+    const closedIssues = totalIssues - openIssues;
+
+    // Issues by priority
+    const issuesByPriorityRows = await this.db
+      .selectFrom('issues')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
+      .where('projects.workspace_id', '=', workspaceId)
+      .select(['issues.priority'])
+      .select(({ fn }) => fn.count('issues.id').as('count'))
+      .groupBy('issues.priority')
+      .execute();
+    const issuesByPriority = issuesByPriorityRows.map(row => ({
+      priority: row.priority,
+      count: Number(row.count),
+    }));
+
+    // Issues by assignee
+    const issuesByAssigneeRows = await this.db
+      .selectFrom('issues')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
+      .leftJoin('users', 'users.id', 'issues.assigned_to')
+      .where('projects.workspace_id', '=', workspaceId)
+      .where('issues.assigned_to', 'is not', null)
+      .select([
+        'issues.assigned_to as userId',
+        'users.name as userName',
+        'users.email as userEmail',
+      ])
+      .select(({ fn }) => fn.count('issues.id').as('count'))
+      .groupBy(['issues.assigned_to', 'users.name', 'users.email'])
+      .orderBy(({ fn }) => fn.count('issues.id'), 'desc')
+      .limit(10)
+      .execute();
+    const issuesByAssignee = issuesByAssigneeRows.map(row => ({
+      userId: row.userId!,
+      userName: row.userName,
+      userEmail: row.userEmail || 'unknown',
+      count: Number(row.count),
+    }));
+
+    // Issues by project
+    const issuesByProjectRows = await this.db
+      .selectFrom('issues')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
+      .where('projects.workspace_id', '=', workspaceId)
+      .select([
+        'projects.id as projectId',
+        'projects.name as projectName',
+        'projects.color as projectColor',
+      ])
+      .select(({ fn }) => fn.count('issues.id').as('count'))
+      .groupBy(['projects.id', 'projects.name', 'projects.color'])
+      .orderBy(({ fn }) => fn.count('issues.id'), 'desc')
+      .execute();
+    const issuesByProject = issuesByProjectRows.map(row => ({
+      projectId: row.projectId,
+      projectName: row.projectName,
+      projectColor: row.projectColor,
+      count: Number(row.count),
+    }));
+
+    // Recent issues
+    const recentIssuesRows = await this.db
+      .selectFrom('issues')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
+      .where('projects.workspace_id', '=', workspaceId)
+      .select([
+        'issues.id',
+        'issues.title',
+        'issues.created_at',
+        'projects.name as projectName',
+      ])
+      .orderBy('issues.created_at', 'desc')
+      .limit(5)
+      .execute();
+    const recentIssues = recentIssuesRows.map(row => ({
+      id: row.id,
+      title: row.title,
+      projectName: row.projectName,
+      createdAt: row.created_at,
+    }));
+
+    return {
+      totalProjects,
+      totalIssues,
+      openIssues,
+      closedIssues,
+      issuesByPriority,
+      issuesByAssignee,
+      issuesByProject,
+      recentIssues,
+    };
   }
 
   private toDomain(row: {

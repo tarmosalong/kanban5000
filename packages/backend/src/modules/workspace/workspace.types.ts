@@ -34,6 +34,22 @@ export interface WorkspaceMember {
   joinedAt: Date;
 }
 
+/**
+ * Workspace member with user details (for API responses).
+ */
+export interface WorkspaceMemberWithUser {
+  workspaceId: string;
+  userId: string;
+  role: WorkspaceMemberRole;
+  joinedAt: Date;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    image: string | null;
+  };
+}
+
 export type WorkspaceMemberRole = 'owner' | 'admin' | 'member' | 'viewer';
 
 /**

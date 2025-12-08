@@ -110,6 +110,38 @@ const LabelDeleteParamsSchema = z.object({
   labelId: z.string().uuid(),
 });
 
+const ProjectStatsSchema = z.object({
+  totalIssues: z.number(),
+  openIssues: z.number(),
+  closedIssues: z.number(),
+  issuesByStatus: z.array(z.object({
+    statusId: z.string().uuid(),
+    statusName: z.string(),
+    statusColor: z.string(),
+    count: z.number(),
+  })),
+  issuesByPriority: z.array(z.object({
+    priority: z.string(),
+    count: z.number(),
+  })),
+  issuesByLabel: z.array(z.object({
+    labelId: z.string().uuid(),
+    labelName: z.string(),
+    labelColor: z.string(),
+    count: z.number(),
+  })),
+  issuesOverTime: z.array(z.object({
+    date: z.string(),
+    created: z.number(),
+    closed: z.number(),
+  })),
+  recentActivity: z.array(z.object({
+    date: z.string(),
+    type: z.string(),
+    count: z.number(),
+  })),
+});
+
 /**
  * Create project routes.
  */
@@ -293,6 +325,20 @@ export function createProjectRoutes(controller: ProjectController): RouteDefinit
         operationId: 'deleteProjectLabel',
       })
       .handler((req) => controller.deleteLabel(req)),
+
+    // Statistics
+    route
+      .get('/projects/:id/stats')
+      .params(IdParamsSchema)
+      .response(ProjectStatsSchema)
+      .use(requireAuth())
+      .meta({
+        summary: 'Get project statistics',
+        description: 'Get statistics and analytics for a project',
+        tags: ['Projects'],
+        operationId: 'getProjectStats',
+      })
+      .handler((req) => controller.getStats(req)),
   ];
 }
 

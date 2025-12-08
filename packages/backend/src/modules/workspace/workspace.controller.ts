@@ -2,12 +2,13 @@ import { UnauthorizedError } from '../../core/index.js';
 import type { AppRequest, HandlerResult } from '../../core/index.js';
 
 import type { IWorkspaceService } from './workspace.service.js';
+import type { WorkspaceStats } from './workspace.repository.js';
 import type {
   Workspace,
   CreateWorkspaceInput,
   UpdateWorkspaceInput,
   WorkspaceFilters,
-  WorkspaceMember,
+  WorkspaceMemberWithUser,
 } from './workspace.types.js';
 
 /**
@@ -80,10 +81,21 @@ export class WorkspaceController {
    */
   async getMembers(
     req: AppRequest<unknown, { id: string }>
-  ): Promise<HandlerResult<WorkspaceMember[]>> {
+  ): Promise<HandlerResult<WorkspaceMemberWithUser[]>> {
     this.requireUser(req);
     const members = await this.workspaceService.getMembers(req.user!.id, req.params.id);
     return { data: members };
+  }
+
+  /**
+   * GET /workspaces/:id/stats
+   */
+  async getStats(
+    req: AppRequest<unknown, { id: string }>
+  ): Promise<HandlerResult<WorkspaceStats>> {
+    this.requireUser(req);
+    const stats = await this.workspaceService.getStats(req.user!.id, req.params.id);
+    return { data: stats };
   }
 
   private requireUser(req: AppRequest): asserts req is AppRequest & { user: NonNullable<AppRequest['user']> } {

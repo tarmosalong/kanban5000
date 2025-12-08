@@ -11,6 +11,7 @@ export type {
   Workspace,
   WorkspaceSettings,
   WorkspaceMember,
+  WorkspaceMemberWithUser,
   WorkspaceMemberRole,
   CreateWorkspaceInput,
   UpdateWorkspaceInput,

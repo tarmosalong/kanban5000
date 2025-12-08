@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui';
+import { WorkspaceStatsSection } from './workspace-stats-section';
 
 // Get characteristic icon and colors for workspace
 function getWorkspaceStyle(slug: string, name: string): { icon: React.ReactNode; gradient: string } {
@@ -123,42 +124,49 @@ export default async function WorkspacesPage() {
 
       {/* Workspace grid */}
       {workspaces.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {workspaces.map((workspace, index) => {
-            const style = getWorkspaceStyle(workspace.slug, workspace.name);
-            return (
-            <Link
-              key={workspace.id}
-              href={`/workspaces/${workspace.id}`}
-              className="group card-hover animate-in"
-              style={{ animationDelay: `${index * 50}ms` }}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${style.gradient} flex items-center justify-center shadow-lg`}>
-                  {style.icon}
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {workspaces.map((workspace, index) => {
+              const style = getWorkspaceStyle(workspace.slug, workspace.name);
+              return (
+              <Link
+                key={workspace.id}
+                href={`/workspaces/${workspace.id}`}
+                className="group card-hover animate-in"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${style.gradient} flex items-center justify-center shadow-lg`}>
+                    {style.icon}
+                  </div>
                 </div>
-              </div>
-              <h3 className="font-semibold text-white group-hover:text-primary-400 transition-colors">
-                {workspace.name}
-              </h3>
-              <p className="text-sm text-slate-500">/{workspace.slug}</p>
-              {workspace.description && (
-                <p className="mt-2 text-sm text-slate-400 line-clamp-2">
-                  {workspace.description}
-                </p>
-              )}
-              <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-between text-xs text-slate-500">
-                <span>
-                  Created {new Date(workspace.createdAt).toLocaleDateString()}
-                </span>
-                <span className="text-slate-400 group-hover:text-primary-400 transition-colors">
-                  Open →
-                </span>
-              </div>
-            </Link>
-          );
-          })}
-        </div>
+                <h3 className="font-semibold text-white group-hover:text-primary-400 transition-colors">
+                  {workspace.name}
+                </h3>
+                <p className="text-sm text-slate-500">/{workspace.slug}</p>
+                {workspace.description && (
+                  <p className="mt-2 text-sm text-slate-400 line-clamp-2">
+                    {workspace.description}
+                  </p>
+                )}
+                <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-between text-xs text-slate-500">
+                  <span>
+                    Created {new Date(workspace.createdAt).toLocaleDateString()}
+                  </span>
+                  <span className="text-slate-400 group-hover:text-primary-400 transition-colors">
+                    Open →
+                  </span>
+                </div>
+              </Link>
+            );
+            })}
+          </div>
+
+          {/* Statistics Section */}
+          <div className="mt-10 pt-8 border-t border-white/[0.06]">
+            <WorkspaceStatsSection workspaces={workspaces.map(w => ({ id: w.id, name: w.name }))} />
+          </div>
+        </>
       )}
     </div>
   );

@@ -23,6 +23,7 @@ export interface IIssueService {
   create(userId: string, projectId: string, input: CreateIssueInput): Promise<Issue>;
   update(userId: string, id: string, input: UpdateIssueInput): Promise<Issue>;
   delete(userId: string, id: string): Promise<void>;
+  reorderIssue(userId: string, issueId: string, statusId: string, position: number): Promise<void>;
   
   // Comments
   getComments(userId: string, issueId: string): Promise<CommentWithAuthor[]>;
@@ -102,6 +103,18 @@ export class IssueService implements IIssueService {
     await this.requireWorkspaceMember(userId, project.workspaceId, ['owner', 'admin']);
 
     await this.issueRepository.delete(id);
+  }
+
+  async reorderIssue(userId: string, issueId: string, statusId: string, position: number): Promise<void> {
+    const issue = await this.issueRepository.findById(issueId);
+    if (!issue) {
+      throw new NotFoundError('Issue', issueId);
+    }
+
+    const project = await this.requireProjectAccess(userId, issue.projectId);
+    await this.requireWorkspaceMember(userId, project.workspaceId, ['owner', 'admin', 'member']);
+
+    await this.issueRepository.reorderIssue(issueId, statusId, position);
   }
 
   // Comments

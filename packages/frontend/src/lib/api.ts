@@ -193,7 +193,40 @@ export const api = {
         userId: string;
         role: string;
         joinedAt: string;
+        user: {
+          id: string;
+          name: string | null;
+          email: string;
+          image: string | null;
+        };
       }>>(`/workspaces/${id}/members`),
+
+    getStats: (id: string) =>
+      api.client.request<{
+        totalProjects: number;
+        totalIssues: number;
+        openIssues: number;
+        closedIssues: number;
+        issuesByPriority: Array<{ priority: string; count: number }>;
+        issuesByAssignee: Array<{ userId: string; userName: string | null; userEmail: string; count: number }>;
+        issuesByProject: Array<{ projectId: string; projectName: string; projectColor: string; count: number }>;
+        recentIssues: Array<{ id: string; title: string; projectName: string; createdAt: string }>;
+      }>(`/workspaces/${id}/stats`),
+  },
+
+  // Projects
+  projects: {
+    getStats: (projectId: string) =>
+      api.client.request<{
+        totalIssues: number;
+        openIssues: number;
+        closedIssues: number;
+        issuesByStatus: Array<{ statusId: string; statusName: string; statusColor: string; count: number }>;
+        issuesByPriority: Array<{ priority: string; count: number }>;
+        issuesByLabel: Array<{ labelId: string; labelName: string; labelColor: string; count: number }>;
+        issuesOverTime: Array<{ date: string; created: number; closed: number }>;
+        recentActivity: Array<{ date: string; type: string; count: number }>;
+      }>(`/projects/${projectId}/stats`),
   },
 };
 

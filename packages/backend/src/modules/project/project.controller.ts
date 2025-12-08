@@ -2,6 +2,7 @@ import { UnauthorizedError } from '../../core/index.js';
 import type { AppRequest, HandlerResult } from '../../core/index.js';
 
 import type { IProjectService } from './project.service.js';
+import type { ProjectStats } from './project.repository.js';
 import type {
   Project,
   IssueStatus,
@@ -193,6 +194,17 @@ export class ProjectController {
       req.params.labelId
     );
     return { data: { success: true } };
+  }
+
+  /**
+   * GET /projects/:id/stats
+   */
+  async getStats(
+    req: AppRequest<unknown, { id: string }>
+  ): Promise<HandlerResult<ProjectStats>> {
+    this.requireUser(req);
+    const stats = await this.projectService.getStats(req.user!.id, req.params.id);
+    return { data: stats };
   }
 
   private requireUser(req: AppRequest): asserts req is AppRequest & { user: NonNullable<AppRequest['user']> } {

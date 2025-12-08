@@ -87,6 +87,22 @@ export class IssueController {
   }
 
   /**
+   * POST /issues/:id/reorder
+   */
+  async reorder(
+    req: AppRequest<{ statusId: string; position: number }, { id: string }>
+  ): Promise<HandlerResult<{ success: boolean }>> {
+    this.requireUser(req);
+    await this.issueService.reorderIssue(
+      req.user!.id,
+      req.params.id,
+      req.body.statusId,
+      req.body.position
+    );
+    return { data: { success: true } };
+  }
+
+  /**
    * GET /issues/:id/comments
    */
   async getComments(
