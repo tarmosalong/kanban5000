@@ -32,6 +32,12 @@ import {
   IssueController,
   createIssueRoutes,
 } from './modules/issue/index.js';
+import {
+  LabelRepository,
+  LabelService,
+  LabelController,
+  createLabelRoutes,
+} from './modules/label/index.js';
 
 // Configuration
 const config = {
@@ -86,11 +92,18 @@ async function bootstrap(): Promise<void> {
   container.register('IssueRepository', issueRepository);
   container.register('IssueService', issueService);
 
+  // Create label module
+  const labelRepository = new LabelRepository(db);
+  const labelService = new LabelService(labelRepository);
+  container.register('LabelRepository', labelRepository);
+  container.register('LabelService', labelService);
+
   // Create controllers
   const authController = new AuthController(authService);
   const workspaceController = new WorkspaceController(workspaceService);
   const projectController = new ProjectController(projectService);
   const issueController = new IssueController(issueService);
+  const labelController = new LabelController(labelService);
 
   // Create Express app
   const app = express();
@@ -115,6 +128,7 @@ async function bootstrap(): Promise<void> {
   router.addAll(createWorkspaceRoutes(workspaceController));
   router.addAll(createProjectRoutes(projectController));
   router.addAll(createIssueRoutes(issueController));
+  router.addAll(createLabelRoutes(labelController));
 
   // Mount routes
   router.mount(app, '/api');

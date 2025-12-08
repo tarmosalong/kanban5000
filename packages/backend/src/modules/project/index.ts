@@ -15,6 +15,7 @@ export type {
   CreateProjectInput,
   UpdateProjectInput,
   CreateStatusInput,
+  UpdateStatusInput,
   CreateLabelInput,
   ProjectFilters,
 } from './project.types.js';

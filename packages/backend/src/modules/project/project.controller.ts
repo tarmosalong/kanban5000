@@ -9,6 +9,7 @@ import type {
   CreateProjectInput,
   UpdateProjectInput,
   CreateStatusInput,
+  UpdateStatusInput,
   CreateLabelInput,
   ProjectFilters,
 } from './project.types.js';
@@ -110,6 +111,32 @@ export class ProjectController {
       req.body
     );
     return { data: status, status: 201 };
+  }
+
+  /**
+   * PATCH /statuses/:id
+   */
+  async updateStatus(
+    req: AppRequest<UpdateStatusInput, { id: string }>
+  ): Promise<HandlerResult<IssueStatus>> {
+    this.requireUser(req);
+    const status = await this.projectService.updateStatus(
+      req.user!.id,
+      req.params.id,
+      req.body
+    );
+    return { data: status };
+  }
+
+  /**
+   * DELETE /statuses/:id
+   */
+  async deleteStatus(
+    req: AppRequest<unknown, { id: string }>
+  ): Promise<HandlerResult<{ success: boolean }>> {
+    this.requireUser(req);
+    await this.projectService.deleteStatus(req.user!.id, req.params.id);
+    return { data: { success: true } };
   }
 
   /**

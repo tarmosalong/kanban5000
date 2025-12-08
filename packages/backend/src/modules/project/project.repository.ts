@@ -29,6 +29,7 @@ export interface IProjectRepository {
   getStatuses(projectId: string): Promise<IssueStatus[]>;
   getStatusById(id: string): Promise<IssueStatus | null>;
   createStatus(projectId: string, input: CreateStatusInput): Promise<IssueStatus>;
+  updateStatus(id: string, input: Partial<CreateStatusInput>): Promise<IssueStatus>;
   updateStatusPositions(projectId: string, statusIds: string[]): Promise<void>;
   deleteStatus(id: string): Promise<void>;
   
@@ -188,6 +189,27 @@ export class ProjectRepository implements IProjectRepository {
         is_default: input.isDefault ?? false,
         is_closed: input.isClosed ?? false,
       })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    return this.toStatusDomain(row);
+  }
+
+  async updateStatus(id: string, input: Partial<CreateStatusInput>): Promise<IssueStatus> {
+    const updates: Record<string, unknown> = {};
+
+    if (input.name !== undefined) {
+      updates.name = input.name;
+      updates.slug = input.slug || this.generateSlug(input.name);
+    }
+    if (input.color !== undefined) updates.color = input.color;
+    if (input.isDefault !== undefined) updates.is_default = input.isDefault;
+    if (input.isClosed !== undefined) updates.is_closed = input.isClosed;
+
+    const row = await this.db
+      .updateTable('issue_statuses')
+      .set(updates)
+      .where('id', '=', id)
       .returningAll()
       .executeTakeFirstOrThrow();
 

@@ -26,6 +26,8 @@ export interface IProjectService {
   // Statuses
   getStatuses(userId: string, projectId: string): Promise<IssueStatus[]>;
   createStatus(userId: string, projectId: string, input: CreateStatusInput): Promise<IssueStatus>;
+  updateStatus(userId: string, statusId: string, input: Partial<CreateStatusInput>): Promise<IssueStatus>;
+  deleteStatus(userId: string, statusId: string): Promise<void>;
   reorderStatuses(userId: string, projectId: string, statusIds: string[]): Promise<void>;
   
   // Labels
@@ -98,6 +100,32 @@ export class ProjectService implements IProjectService {
     await this.requireWorkspaceMember(userId, project.workspaceId, ['owner', 'admin']);
 
     return this.projectRepository.createStatus(projectId, input);
+  }
+
+  async updateStatus(userId: string, statusId: string, input: Partial<CreateStatusInput>): Promise<IssueStatus> {
+    const status = await this.projectRepository.getStatusById(statusId);
+    if (!status) {
+      throw new NotFoundError('Status', statusId);
+    }
+
+    const project = await this.findById(userId, status.projectId);
+    await this.requireWorkspaceMember(userId, project.workspaceId, ['owner', 'admin']);
+
+    return this.projectRepository.updateStatus(statusId, input);
+  }
+
+  async deleteStatus(userId: string, statusId: string): Promise<void> {
+    const status = await this.projectRepository.getStatusById(statusId);
+    if (!status) {
+      throw new NotFoundError('Status', statusId);
+    }
+
+    const project = await this.findById(userId, status.projectId);
+    await this.requireWorkspaceMember(userId, project.workspaceId, ['owner', 'admin']);
+
+    // Check if status has issues - if so, prevent deletion
+    // For now, just delete
+    await this.projectRepository.deleteStatus(statusId);
   }
 
   async reorderStatuses(userId: string, projectId: string, statusIds: string[]): Promise<void> {

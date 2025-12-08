@@ -67,8 +67,20 @@ const CreateStatusSchema = z.object({
   isClosed: z.boolean().optional(),
 });
 
+const UpdateStatusSchema = z.object({
+  name: z.string().min(1).max(50).optional(),
+  slug: z.string().min(1).max(50).regex(/^[a-z0-9-]+$/).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  isDefault: z.boolean().optional(),
+  isClosed: z.boolean().optional(),
+});
+
 const ReorderStatusesSchema = z.object({
   statusIds: z.array(z.string().uuid()),
+});
+
+const StatusIdParamsSchema = z.object({
+  id: z.string().uuid(),
 });
 
 const LabelSchema = z.object({
@@ -199,6 +211,33 @@ export function createProjectRoutes(controller: ProjectController): RouteDefinit
         operationId: 'createProjectStatus',
       })
       .handler((req) => controller.createStatus(req)),
+
+    route
+      .patch('/statuses/:id')
+      .params(StatusIdParamsSchema)
+      .body(UpdateStatusSchema)
+      .response(IssueStatusSchema)
+      .use(requireAuth())
+      .meta({
+        summary: 'Update status',
+        description: 'Update an issue status',
+        tags: ['Statuses'],
+        operationId: 'updateStatus',
+      })
+      .handler((req) => controller.updateStatus(req)),
+
+    route
+      .delete('/statuses/:id')
+      .params(StatusIdParamsSchema)
+      .response(z.object({ success: z.boolean() }))
+      .use(requireAuth())
+      .meta({
+        summary: 'Delete status',
+        description: 'Delete an issue status',
+        tags: ['Statuses'],
+        operationId: 'deleteStatus',
+      })
+      .handler((req) => controller.deleteStatus(req)),
 
     route
       .put('/projects/:id/statuses/order')

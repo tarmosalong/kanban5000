@@ -81,6 +81,17 @@ export interface CreateStatusInput {
 }
 
 /**
+ * Update status input.
+ */
+export interface UpdateStatusInput {
+  name?: string;
+  slug?: string;
+  color?: string;
+  isDefault?: boolean;
+  isClosed?: boolean;
+}
+
+/**
  * Create label input.
  */
 export interface CreateLabelInput {
