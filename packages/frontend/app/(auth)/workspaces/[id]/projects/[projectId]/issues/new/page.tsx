@@ -28,6 +28,7 @@ export default function NewIssuePage() {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [statusId, setStatusId] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [statuses, setStatuses] = useState<IssueStatus[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +69,7 @@ export default function NewIssuePage() {
           description: description || null,
           priority,
           statusId,
+          dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         }),
       });
 
@@ -118,7 +120,7 @@ export default function NewIssuePage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
               <select
@@ -147,6 +149,16 @@ export default function NewIssuePage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2">Due Date</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 [color-scheme:dark]"
+              />
             </div>
           </div>
 

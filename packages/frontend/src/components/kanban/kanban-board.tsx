@@ -54,6 +54,7 @@ export interface Issue {
     name: string;
     color: string;
   }>;
+  dueDate: string | null;
   createdAt: string;
 }
 

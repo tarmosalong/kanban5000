@@ -381,9 +381,21 @@ export class IssueRepository implements IIssueRepository {
   async getHistory(issueId: string): Promise<IssueHistoryEntry[]> {
     const rows = await this.db
       .selectFrom('issue_history')
-      .selectAll()
-      .where('issue_id', '=', issueId)
-      .orderBy('created_at', 'desc')
+      .innerJoin('users', 'users.id', 'issue_history.user_id')
+      .select([
+        'issue_history.id',
+        'issue_history.issue_id',
+        'issue_history.user_id',
+        'issue_history.action',
+        'issue_history.field_name',
+        'issue_history.old_value',
+        'issue_history.new_value',
+        'issue_history.created_at',
+        'users.name as user_name',
+        'users.email as user_email',
+      ])
+      .where('issue_history.issue_id', '=', issueId)
+      .orderBy('issue_history.created_at', 'desc')
       .execute();
 
     return rows.map((row) => ({
@@ -395,6 +407,11 @@ export class IssueRepository implements IIssueRepository {
       oldValue: row.old_value,
       newValue: row.new_value,
       createdAt: row.created_at,
+      user: {
+        id: row.user_id,
+        name: row.user_name,
+        email: row.user_email,
+      },
     }));
   }
 

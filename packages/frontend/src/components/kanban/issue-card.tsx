@@ -17,6 +17,44 @@ interface IssueCardProps {
   isDragging?: boolean;
 }
 
+function getDueDateStatus(dueDate: string | null): { 
+  isOverdue: boolean; 
+  isDueSoon: boolean;
+  label: string | null;
+} {
+  if (!dueDate) return { isOverdue: false, isDueSoon: false, label: null };
+  
+  const due = new Date(dueDate);
+  const now = new Date();
+  const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) {
+    return { 
+      isOverdue: true, 
+      isDueSoon: false, 
+      label: diffDays === -1 ? 'Overdue 1 day' : `Overdue ${Math.abs(diffDays)} days` 
+    };
+  }
+  
+  if (diffDays === 0) {
+    return { isOverdue: false, isDueSoon: true, label: 'Due today' };
+  }
+  
+  if (diffDays <= 3) {
+    return { 
+      isOverdue: false, 
+      isDueSoon: true, 
+      label: diffDays === 1 ? 'Due tomorrow' : `Due in ${diffDays} days` 
+    };
+  }
+  
+  return { 
+    isOverdue: false, 
+    isDueSoon: false, 
+    label: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
+  };
+}
+
 export function IssueCard({
   issue,
   workspaceId,
@@ -24,6 +62,7 @@ export function IssueCard({
   isDragging,
 }: IssueCardProps) {
   const priority = PRIORITY_CONFIG[issue.priority];
+  const dueDateStatus = getDueDateStatus(issue.dueDate);
 
   const cardContent = (
     <div
@@ -37,6 +76,7 @@ export function IssueCard({
           ? 'shadow-xl shadow-primary-500/20 border-primary-500/40 scale-[1.02] rotate-1' 
           : ''
         }
+        ${dueDateStatus.isOverdue ? 'border-l-2 border-l-red-500' : ''}
       `}
     >
       {/* Priority indicator line */}
@@ -81,6 +121,28 @@ export function IssueCard({
               +{issue.labelDetails.length - 2}
             </span>
           )}
+        </div>
+      )}
+
+      {/* Due Date Badge */}
+      {dueDateStatus.label && (
+        <div className="mb-2.5">
+          <span
+            className={`
+              inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded font-medium
+              ${dueDateStatus.isOverdue 
+                ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                : dueDateStatus.isDueSoon 
+                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : 'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+              }
+            `}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            {dueDateStatus.label}
+          </span>
         </div>
       )}
 

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Button } from '@/components/ui';
+import { Button, useToast } from '@/components/ui';
 import { KanbanBoard, type Issue, type IssueStatus } from '@/components/kanban';
 
 interface Project {
@@ -36,6 +36,7 @@ const PRIORITY_OPTIONS = [
 
 export default function ProjectPage() {
   const params = useParams();
+  const { addToast } = useToast();
   const workspaceId = params.id as string;
   const projectId = params.projectId as string;
 
@@ -92,40 +93,53 @@ export default function ProjectPage() {
 
   const handleIssueMove = useCallback(
     async (issueId: string, newStatusId: string) => {
-      const res = await fetch(`/api/issues/${issueId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ statusId: newStatusId }),
-      });
+      try {
+        const res = await fetch(`/api/issues/${issueId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ statusId: newStatusId }),
+        });
 
-      if (!res.ok) {
-        throw new Error('Failed to update issue');
+        if (!res.ok) {
+          throw new Error('Failed to update issue');
+        }
+
+        const newStatus = statuses.find(s => s.id === newStatusId);
+        addToast(`Issue moved to ${newStatus?.name || 'new status'}`, 'success');
+        await fetchData();
+      } catch (err) {
+        addToast('Failed to move issue', 'error');
+        throw err;
       }
-
-      await fetchData();
     },
-    [fetchData]
+    [fetchData, statuses, addToast]
   );
 
   const handleQuickCreate = useCallback(
     async (title: string, statusId: string) => {
-      const res = await fetch(`/api/projects/${projectId}/issues`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          title, 
-          statusId,
-          priority: 'medium',
-        }),
-      });
+      try {
+        const res = await fetch(`/api/projects/${projectId}/issues`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            title, 
+            statusId,
+            priority: 'medium',
+          }),
+        });
 
-      if (!res.ok) {
-        throw new Error('Failed to create issue');
+        if (!res.ok) {
+          throw new Error('Failed to create issue');
+        }
+
+        addToast(`Issue "${title}" created`, 'success');
+        await fetchData();
+      } catch (err) {
+        addToast('Failed to create issue', 'error');
+        throw err;
       }
-
-      await fetchData();
     },
-    [projectId, fetchData]
+    [projectId, fetchData, addToast]
   );
 
   // Get unique assignees from issues

@@ -89,6 +89,11 @@ export interface IssueHistoryEntry {
   oldValue: string | null;
   newValue: string | null;
   createdAt: Date;
+  user?: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
 }
 
 /**

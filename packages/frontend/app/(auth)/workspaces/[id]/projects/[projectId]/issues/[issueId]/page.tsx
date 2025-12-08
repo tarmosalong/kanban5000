@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Button, Card } from '@/components/ui';
+import { Button, Card, Markdown, useToast } from '@/components/ui';
 
 interface Label {
   id: string;
@@ -35,6 +35,7 @@ interface Issue {
   };
   labels: string[];
   labelDetails: Label[];
+  dueDate: string | null;
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
@@ -59,6 +60,22 @@ interface IssueStatus {
   color: string;
 }
 
+interface HistoryEntry {
+  id: string;
+  issueId: string;
+  userId: string;
+  action: string;
+  fieldName: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+  user?: {
+    id: string;
+    name: string | null;
+    email: string;
+  };
+}
+
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Low', color: '#6b7280' },
   { value: 'medium', label: 'Medium', color: '#3b82f6' },
@@ -74,12 +91,17 @@ export default function IssuePage() {
 
   const [issue, setIssue] = useState<Issue | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [statuses, setStatuses] = useState<IssueStatus[]>([]);
   const [projectLabels, setProjectLabels] = useState<Label[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showLabelPicker, setShowLabelPicker] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(false);
+  const [descriptionDraft, setDescriptionDraft] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const { addToast } = useToast();
 
   useEffect(() => {
     fetchData();
@@ -103,6 +125,15 @@ export default function IssuePage() {
       setComments(commentsData.data || []);
       setStatuses(statusesData.data || []);
       setProjectLabels(labelsData.data || []);
+
+      // Fetch history separately to avoid blocking main data
+      try {
+        const historyRes = await fetch(`/api/issues/${issueId}/history`);
+        const historyData = await historyRes.json();
+        setHistory(historyData.data || []);
+      } catch {
+        setHistory([]);
+      }
     } catch (err) {
       console.error('Failed to fetch issue:', err);
     } finally {
@@ -164,6 +195,48 @@ export default function IssuePage() {
     } catch (err) {
       console.error('Failed to update labels:', err);
     }
+  }
+
+  async function handleDueDateChange(newDueDate: string | null) {
+    try {
+      const res = await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dueDate: newDueDate }),
+      });
+
+      if (res.ok) {
+        addToast('Due date updated', 'success');
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Failed to update due date:', err);
+      addToast('Failed to update due date', 'error');
+    }
+  }
+
+  async function handleSaveDescription() {
+    try {
+      const res = await fetch(`/api/issues/${issueId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: descriptionDraft || null }),
+      });
+
+      if (res.ok) {
+        addToast('Description updated', 'success');
+        setEditingDescription(false);
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Failed to update description:', err);
+      addToast('Failed to update description', 'error');
+    }
+  }
+
+  function startEditingDescription() {
+    setDescriptionDraft(issue?.description || '');
+    setEditingDescription(true);
   }
 
   async function handleAddComment(e: React.FormEvent) {
@@ -252,15 +325,57 @@ export default function IssuePage() {
         <div className="col-span-2 space-y-6">
           {/* Description */}
           <Card className="p-6 bg-surface-card border-white/[0.06]">
-            <h2 className="text-sm font-medium text-slate-400 mb-3">
-              Description
-            </h2>
-            {issue.description ? (
-              <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap text-slate-300">
-                {issue.description}
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-medium text-slate-400">
+                Description
+              </h2>
+              {!editingDescription ? (
+                <button
+                  onClick={startEditingDescription}
+                  className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                >
+                  Edit
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditingDescription(false)}
+                    className="text-xs text-slate-400 hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveDescription}
+                    className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            {editingDescription ? (
+              <div className="space-y-2">
+                <textarea
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  placeholder="Add a description... (Markdown supported)"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 resize-none font-mono text-sm"
+                  rows={10}
+                />
+                <p className="text-[10px] text-slate-500">
+                  Supports Markdown: **bold**, *italic*, `code`, [links](url), lists, and more
+                </p>
               </div>
+            ) : issue.description ? (
+              <Markdown content={issue.description} />
             ) : (
-              <p className="text-slate-500 italic">No description provided</p>
+              <button
+                onClick={startEditingDescription}
+                className="text-slate-500 italic hover:text-slate-400 transition-colors"
+              >
+                Click to add description...
+              </button>
             )}
           </Card>
 
@@ -327,6 +442,91 @@ export default function IssuePage() {
                 </Button>
               </div>
             </form>
+          </Card>
+
+          {/* Activity Log */}
+          <Card className="p-6 bg-surface-card border-white/[0.06]">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <h2 className="text-sm font-medium text-slate-400">
+                Activity ({history.length})
+              </h2>
+              <svg 
+                className={`w-4 h-4 text-slate-500 transition-transform ${showHistory ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showHistory && (
+              <div className="mt-4 space-y-3">
+                {history.map((entry) => (
+                  <div key={entry.id} className="flex gap-3 text-sm">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-500/20 flex items-center justify-center">
+                      {entry.action === 'created' && (
+                        <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      )}
+                      {entry.action === 'updated' && (
+                        <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      )}
+                      {entry.action === 'commented' && (
+                        <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-300">
+                        {entry.action === 'created' && 'Issue created'}
+                        {entry.action === 'commented' && 'Added a comment'}
+                        {entry.action === 'updated' && entry.fieldName && (
+                          <>
+                            Changed <span className="text-white font-medium">{entry.fieldName}</span>
+                            {entry.oldValue && entry.newValue && (
+                              <>
+                                {' '}from <span className="text-slate-400">
+                                  {entry.fieldName === 'status' 
+                                    ? statuses.find(s => s.id === entry.oldValue)?.name || entry.oldValue
+                                    : entry.oldValue}
+                                </span>
+                                {' '}to <span className="text-white">
+                                  {entry.fieldName === 'status' 
+                                    ? statuses.find(s => s.id === entry.newValue)?.name || entry.newValue
+                                    : entry.newValue}
+                                </span>
+                              </>
+                            )}
+                          </>
+                        )}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {new Date(entry.createdAt).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+
+                {history.length === 0 && (
+                  <p className="text-slate-500 text-sm text-center py-4">
+                    No activity yet
+                  </p>
+                )}
+              </div>
+            )}
           </Card>
         </div>
 
@@ -464,6 +664,48 @@ export default function IssuePage() {
               </div>
             ) : (
               <p className="text-slate-500 text-sm">Unassigned</p>
+            )}
+          </Card>
+
+          {/* Due Date */}
+          <Card className={`p-4 bg-surface-card border-white/[0.06] ${
+            issue.dueDate && new Date(issue.dueDate) < new Date() 
+              ? 'border-l-2 border-l-red-500' 
+              : ''
+          }`}>
+            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Due Date</h3>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={issue.dueDate ? new Date(issue.dueDate).toISOString().split('T')[0] : ''}
+                onChange={(e) => handleDueDateChange(e.target.value ? new Date(e.target.value).toISOString() : null)}
+                className="flex-1 px-2 py-1.5 bg-white/5 border border-white/10 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-primary-500/50 [color-scheme:dark]"
+              />
+              {issue.dueDate && (
+                <button
+                  onClick={() => handleDueDateChange(null)}
+                  className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+                  title="Clear due date"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {issue.dueDate && (
+              <p className={`text-xs mt-2 ${
+                new Date(issue.dueDate) < new Date() 
+                  ? 'text-red-400' 
+                  : new Date(issue.dueDate).getTime() - new Date().getTime() < 3 * 24 * 60 * 60 * 1000
+                    ? 'text-amber-400'
+                    : 'text-slate-400'
+              }`}>
+                {new Date(issue.dueDate) < new Date() 
+                  ? `Overdue by ${Math.ceil((new Date().getTime() - new Date(issue.dueDate).getTime()) / (1000 * 60 * 60 * 24))} days`
+                  : `${Math.ceil((new Date(issue.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days remaining`
+                }
+              </p>
             )}
           </Card>
 
