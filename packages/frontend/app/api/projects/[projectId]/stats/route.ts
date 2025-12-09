@@ -4,7 +4,7 @@ import { api } from '@/lib/api';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: { params: Promise<{ projectId: string }> }
 ) {
   const session = await auth();
   if (!session?.backendToken) {
@@ -12,7 +12,8 @@ export async function GET(
   }
 
   try {
-    const { data } = await api.projects.getStats(params.projectId);
+    const { projectId } = await params;
+    const { data } = await api.projects.getStats(projectId);
     return NextResponse.json({ data });
   } catch (error: any) {
     console.error('Failed to get project stats:', error);
