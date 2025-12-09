@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button, useToast } from '@/components/ui';
 import { KanbanBoard, type Issue, type IssueStatus } from '@/components/kanban';
+import { IssuePreviewPanel } from '@/components/issue';
 
 interface Project {
   id: string;
@@ -59,6 +60,9 @@ export default function ProjectPage() {
   
   // View mode
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
+  
+  // Selected issue for preview panel
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -164,8 +168,14 @@ export default function ProjectPage() {
       if (filters.priority && issue.priority !== filters.priority) {
         return false;
       }
-      if (filters.assigneeId && issue.assignee?.id !== filters.assigneeId) {
-        return false;
+      if (filters.assigneeId) {
+        if (filters.assigneeId === 'unassigned') {
+          // Show only unassigned issues
+          if (issue.assignee) return false;
+        } else {
+          // Show only issues assigned to specific user
+          if (issue.assignee?.id !== filters.assigneeId) return false;
+        }
       }
       if (filters.labelId && !issue.labels.includes(filters.labelId)) {
         return false;
@@ -506,6 +516,7 @@ export default function ProjectPage() {
                 projectId={projectId}
                 onIssueMove={handleIssueMove}
                 onQuickCreate={handleQuickCreate}
+                onIssueClick={setSelectedIssue}
               />
             </div>
           </div>
@@ -515,9 +526,18 @@ export default function ProjectPage() {
             statuses={statuses}
             workspaceId={workspaceId}
             projectId={projectId}
+            onIssueClick={setSelectedIssue}
           />
         )}
       </div>
+
+      {/* Issue Preview Panel */}
+      <IssuePreviewPanel
+        issue={selectedIssue}
+        workspaceId={workspaceId}
+        projectId={projectId}
+        onClose={() => setSelectedIssue(null)}
+      />
     </div>
   );
 }
@@ -527,12 +547,14 @@ function IssueListView({
   issues, 
   statuses,
   workspaceId, 
-  projectId 
+  projectId,
+  onIssueClick,
 }: { 
   issues: Issue[]; 
   statuses: IssueStatus[];
   workspaceId: string; 
   projectId: string;
+  onIssueClick?: (issue: Issue) => void;
 }) {
   const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
     low: { bg: 'bg-slate-500/10', text: 'text-slate-400' },
@@ -569,12 +591,13 @@ function IssueListView({
                   <span className="text-slate-500 font-mono text-sm">#{issue.number}</span>
                 </td>
                 <td className="px-4 py-3">
-                  <Link 
-                    href={`/workspaces/${workspaceId}/projects/${projectId}/issues/${issue.id}`}
-                    className="text-slate-100 hover:text-primary-400 transition-colors font-medium"
+                  <button
+                    type="button"
+                    onClick={() => onIssueClick?.(issue)}
+                    className="text-slate-100 hover:text-primary-400 transition-colors font-medium text-left"
                   >
                     {issue.title}
-                  </Link>
+                  </button>
                   {issue.labelDetails.length > 0 && (
                     <div className="flex gap-1 mt-1">
                       {issue.labelDetails.slice(0, 3).map((label) => (

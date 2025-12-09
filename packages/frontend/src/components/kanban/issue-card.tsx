@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import type { Issue } from './kanban-board';
 
 const PRIORITY_CONFIG = {
@@ -15,6 +14,7 @@ interface IssueCardProps {
   workspaceId: string;
   projectId: string;
   isDragging?: boolean;
+  onClick?: (issue: Issue) => void;
 }
 
 function getDueDateStatus(dueDate: string | null): { 
@@ -60,6 +60,7 @@ export function IssueCard({
   workspaceId,
   projectId,
   isDragging,
+  onClick,
 }: IssueCardProps) {
   const priority = PRIORITY_CONFIG[issue.priority];
   const dueDateStatus = getDueDateStatus(issue.dueDate);
@@ -186,13 +187,15 @@ export function IssueCard({
   }
 
   return (
-    <Link
-      href={`/workspaces/${workspaceId}/projects/${projectId}/issues/${issue.id}`}
+    <button
+      type="button"
+      className="w-full text-left"
       onClick={(e) => {
         if (e.defaultPrevented) return;
+        onClick?.(issue);
       }}
     >
       {cardContent}
-    </Link>
+    </button>
   );
 }

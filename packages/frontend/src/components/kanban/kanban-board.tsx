@@ -65,6 +65,7 @@ interface KanbanBoardProps {
   projectId: string;
   onIssueMove: (issueId: string, newStatusId: string, position: number) => Promise<void>;
   onQuickCreate?: (title: string, statusId: string) => Promise<void>;
+  onIssueClick?: (issue: Issue) => void;
 }
 
 // Draggable issue card
@@ -72,12 +73,14 @@ function DraggableIssue({
   issue, 
   workspaceId, 
   projectId, 
-  isDragging 
+  isDragging,
+  onIssueClick,
 }: { 
   issue: Issue; 
   workspaceId: string; 
   projectId: string;
   isDragging: boolean;
+  onIssueClick?: (issue: Issue) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: issue.id });
 
@@ -93,7 +96,7 @@ function DraggableIssue({
       {...attributes}
       className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-40' : ''}`}
     >
-      <IssueCard issue={issue} workspaceId={workspaceId} projectId={projectId} />
+      <IssueCard issue={issue} workspaceId={workspaceId} projectId={projectId} onClick={onIssueClick} />
     </div>
   );
 }
@@ -203,6 +206,7 @@ export function KanbanBoard({
   projectId,
   onIssueMove,
   onQuickCreate,
+  onIssueClick,
 }: KanbanBoardProps) {
   const [mounted, setMounted] = useState(false);
   
@@ -417,6 +421,7 @@ export function KanbanBoard({
             workspaceId={workspaceId}
             projectId={projectId}
             isDragging={issue.id === activeId}
+            onIssueClick={onIssueClick}
           />
         </DroppableIssueZone>
       ));
@@ -466,6 +471,7 @@ export function KanbanBoard({
             workspaceId={workspaceId}
             projectId={projectId}
             isDragging={isDragging}
+            onIssueClick={onIssueClick}
           />
         </DroppableIssueZone>
       );
@@ -507,7 +513,7 @@ export function KanbanBoard({
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
               {column.issues.map((issue) => (
-                <IssueCard key={issue.id} issue={issue} workspaceId={workspaceId} projectId={projectId} />
+                <IssueCard key={issue.id} issue={issue} workspaceId={workspaceId} projectId={projectId} onClick={onIssueClick} />
               ))}
             </div>
           </div>
