@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
+import cookieParser from 'cookie-parser';
 
 import { Router, errorHandler, container } from './core/index.js';
 import { createDatabase } from './infra/index.js';
@@ -38,6 +39,7 @@ import {
   LabelController,
   createLabelRoutes,
 } from './modules/label/index.js';
+import { createAdminRoutes } from './modules/admin/index.js';
 
 // Configuration
 const config = {
@@ -109,10 +111,24 @@ async function bootstrap(): Promise<void> {
   const app = express();
 
   // Global middleware
-  app.use(helmet());
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+  }));
   app.use(cors());
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
   app.use(pinoHttp({ logger }));
+
+  // Admin routes (before auth middleware to allow admin login)
+  app.use('/admin', createAdminRoutes(db));
 
   // Auth middleware (extracts JWT if present)
   app.use(createAuthMiddleware(jwtService));

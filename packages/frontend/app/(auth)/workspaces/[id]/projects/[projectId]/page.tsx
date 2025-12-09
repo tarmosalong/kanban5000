@@ -25,6 +25,7 @@ interface Filters {
   priority: string | null;
   assigneeId: string | null;
   labelId: string | null;
+  statusId: string | null;
 }
 
 const PRIORITY_OPTIONS = [
@@ -52,8 +53,12 @@ export default function ProjectPage() {
     priority: null,
     assigneeId: null,
     labelId: null,
+    statusId: null,
   });
   const [showFilters, setShowFilters] = useState(false);
+  
+  // View mode
+  const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
 
   const fetchData = useCallback(async () => {
     try {
@@ -165,15 +170,18 @@ export default function ProjectPage() {
       if (filters.labelId && !issue.labels.includes(filters.labelId)) {
         return false;
       }
+      if (filters.statusId && issue.status.id !== filters.statusId) {
+        return false;
+      }
       return true;
     });
   }, [issues, filters]);
 
   // Check if any filters are active
-  const hasActiveFilters = filters.priority || filters.assigneeId || filters.labelId;
+  const hasActiveFilters = filters.priority || filters.assigneeId || filters.labelId || filters.statusId;
 
   const clearFilters = () => {
-    setFilters({ priority: null, assigneeId: null, labelId: null });
+    setFilters({ priority: null, assigneeId: null, labelId: null, statusId: null });
   };
 
   if (loading) {
@@ -245,6 +253,36 @@ export default function ProjectPage() {
               <span className="text-slate-500">{hasActiveFilters ? `${filteredIssues.length} filtered` : `${totalIssues} total`}</span>
             </div>
             
+            {/* View toggle */}
+            <div className="flex items-center bg-white/[0.05] rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('board')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'board'
+                    ? 'bg-primary-500/20 text-primary-400'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="Board view"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-1.5 rounded-md transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-primary-500/20 text-primary-400'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="List view"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+
             {/* Filter toggle button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -377,6 +415,39 @@ export default function ProjectPage() {
               </div>
             </div>
 
+            <div className="h-4 w-px bg-white/10" />
+
+            {/* Status filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Status</span>
+              <div className="flex gap-1 flex-wrap">
+                {statuses.map((status) => (
+                  <button
+                    key={status.id}
+                    onClick={() => setFilters(f => ({
+                      ...f,
+                      statusId: f.statusId === status.id ? null : status.id
+                    }))}
+                    className={`px-2 py-0.5 text-xs font-medium rounded-full transition-all flex items-center gap-1 ${
+                      filters.statusId === status.id
+                        ? 'ring-2 ring-offset-1 ring-offset-surface'
+                        : 'opacity-60 hover:opacity-100'
+                    }`}
+                    style={{
+                      backgroundColor: `${status.color}20`,
+                      color: status.color,
+                    }}
+                  >
+                    <span 
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: status.color }}
+                    />
+                    {status.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Clear filters */}
             {hasActiveFilters && (
               <>
@@ -393,7 +464,7 @@ export default function ProjectPage() {
         </div>
       )}
 
-      {/* Kanban Board - fills remaining space */}
+      {/* Content - fills remaining space */}
       <div className="flex-1 overflow-hidden p-4">
         {issues.length === 0 ? (
           <div className="flex items-center justify-center h-full">
@@ -425,7 +496,7 @@ export default function ProjectPage() {
               </Button>
             </div>
           </div>
-        ) : (
+        ) : viewMode === 'board' ? (
           <div className="h-full overflow-x-auto">
             <div className="flex gap-3 h-full pb-2">
               <KanbanBoard
@@ -438,8 +509,149 @@ export default function ProjectPage() {
               />
             </div>
           </div>
+        ) : (
+          <IssueListView
+            issues={filteredIssues}
+            statuses={statuses}
+            workspaceId={workspaceId}
+            projectId={projectId}
+          />
         )}
       </div>
+    </div>
+  );
+}
+
+// List view component
+function IssueListView({ 
+  issues, 
+  statuses,
+  workspaceId, 
+  projectId 
+}: { 
+  issues: Issue[]; 
+  statuses: IssueStatus[];
+  workspaceId: string; 
+  projectId: string;
+}) {
+  const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
+    low: { bg: 'bg-slate-500/10', text: 'text-slate-400' },
+    medium: { bg: 'bg-blue-500/10', text: 'text-blue-400' },
+    high: { bg: 'bg-amber-500/10', text: 'text-amber-400' },
+    urgent: { bg: 'bg-red-500/10', text: 'text-red-400' },
+  };
+
+  return (
+    <div className="h-full overflow-auto">
+      <table className="w-full">
+        <thead className="sticky top-0 bg-surface">
+          <tr className="border-b border-white/[0.06]">
+            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-16">#</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Title</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-32">Status</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-24">Priority</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-40">Assignee</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-28">Due Date</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-28">Created</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/[0.04]">
+          {issues.map((issue) => {
+            const priorityStyle = PRIORITY_COLORS[issue.priority] || PRIORITY_COLORS.medium;
+            const isOverdue = issue.dueDate && new Date(issue.dueDate) < new Date();
+            
+            return (
+              <tr 
+                key={issue.id} 
+                className="hover:bg-white/[0.02] transition-colors group"
+              >
+                <td className="px-4 py-3">
+                  <span className="text-slate-500 font-mono text-sm">#{issue.number}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <Link 
+                    href={`/workspaces/${workspaceId}/projects/${projectId}/issues/${issue.id}`}
+                    className="text-slate-100 hover:text-primary-400 transition-colors font-medium"
+                  >
+                    {issue.title}
+                  </Link>
+                  {issue.labelDetails.length > 0 && (
+                    <div className="flex gap-1 mt-1">
+                      {issue.labelDetails.slice(0, 3).map((label) => (
+                        <span
+                          key={label.id}
+                          className="text-[10px] px-1.5 py-0.5 rounded"
+                          style={{
+                            backgroundColor: `${label.color}15`,
+                            color: label.color,
+                          }}
+                        >
+                          {label.name}
+                        </span>
+                      ))}
+                      {issue.labelDetails.length > 3 && (
+                        <span className="text-[10px] text-slate-500">+{issue.labelDetails.length - 3}</span>
+                      )}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <span 
+                    className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full"
+                    style={{
+                      backgroundColor: `${issue.status.color}15`,
+                      color: issue.status.color,
+                    }}
+                  >
+                    <span 
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: issue.status.color }}
+                    />
+                    {issue.status.name}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span className={`text-xs font-medium px-2 py-1 rounded ${priorityStyle.bg} ${priorityStyle.text}`}>
+                    {issue.priority.charAt(0).toUpperCase() + issue.priority.slice(1)}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  {issue.assignee ? (
+                    <div className="flex items-center gap-2">
+                      {issue.assignee.image ? (
+                        <img src={issue.assignee.image} alt="" className="w-6 h-6 rounded-full" />
+                      ) : (
+                        <div className="w-6 h-6 rounded-full bg-primary-500/20 flex items-center justify-center text-xs text-primary-400">
+                          {(issue.assignee.name || issue.assignee.email)[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span className="text-sm text-slate-300 truncate">
+                        {issue.assignee.name?.split(' ')[0] || issue.assignee.email.split('@')[0]}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-slate-600 italic">Unassigned</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {issue.dueDate ? (
+                    <span className={`text-sm ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
+                      {new Date(issue.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-slate-600">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <span className="text-sm text-slate-500">
+                    {new Date(issue.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
