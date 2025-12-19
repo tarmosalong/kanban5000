@@ -13,12 +13,16 @@
     "db:migrate:create": "pnpm --filter @kanban5000/backend db:migrate:create",
     "db:reset": "pnpm --filter @kanban5000/backend db:reset",
     "generate:api": "pnpm --filter @kanban5000/backend generate:openapi && pnpm --filter @kanban5000/api-client generate",
-    "clean": "pnpm -r clean && rm -rf node_modules"
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "arch:validate": "depcruise packages --config .dependency-cruiser.cjs",
+    "arch:graph": "depcruise packages --config .dependency-cruiser.cjs --output-type dot | dot -T svg > dependency-graph.svg"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.14.2"
+  "packageManager": "pnpm@9.14.2",
+  "devDependencies": {
+    "dependency-cruiser": "^17.3.4"
+  }
 }
-

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
 
 interface SearchResult {
   id: string;
@@ -107,7 +106,7 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
   }, [projectContext, router]);
 
   if (!projectContext) {
-    return null; // Don't show search outside of project context
+    return null;
   }
 
   return (
@@ -122,11 +121,11 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
             setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder="Search issues... (⌘K)"
-          className="w-48 sm:w-64 px-3 py-1.5 pl-9 text-sm bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-primary-500/50 focus:bg-white/[0.07] transition-all"
+          placeholder="Search issues..."
+          className="w-48 sm:w-56 px-3 py-1.5 pl-8 text-[13px] bg-white/[0.03] border border-white/[0.06] rounded-lg text-white placeholder:text-zinc-600 focus:outline-none focus:border-accent-400/30 focus:bg-white/[0.05] transition-all"
         />
         <svg
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"
+          className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -134,35 +133,38 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeWidth={2}
+            strokeWidth={1.5}
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
           />
         </svg>
-        {isLoading && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-            <div className="w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
-          </div>
-        )}
+        {/* Keyboard shortcut hint */}
+        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5">
+          {isLoading ? (
+            <div className="w-3.5 h-3.5 border-[1.5px] border-zinc-700 border-t-accent-400 rounded-full animate-spin" />
+          ) : (
+            <kbd className="text-[10px] text-zinc-600 bg-white/[0.04] px-1 py-0.5 rounded border border-white/[0.06]">⌘K</kbd>
+          )}
+        </div>
       </div>
 
       {/* Results dropdown */}
       {isOpen && query.trim() && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-surface-elevated border border-white/10 rounded-lg shadow-xl overflow-hidden z-50">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/[0.06] rounded-lg shadow-xl overflow-hidden z-50">
           {results.length > 0 ? (
             <div className="max-h-80 overflow-y-auto py-1">
               {results.map((result) => (
                 <button
                   key={result.id}
                   onClick={() => handleResultClick(result)}
-                  className="w-full px-3 py-2 text-left hover:bg-white/5 transition-colors flex items-center gap-3"
+                  className="w-full px-3 py-2 text-left hover:bg-white/[0.04] transition-colors flex items-center gap-3"
                 >
-                  <span className="text-slate-500 text-xs font-mono">#{result.number}</span>
-                  <span className="text-sm text-slate-200 truncate flex-1">{result.title}</span>
+                  <span className="text-zinc-600 text-[11px] font-mono">#{result.number}</span>
+                  <span className="text-[13px] text-zinc-300 truncate flex-1">{result.title}</span>
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                     result.priority === 'urgent' ? 'bg-red-500/10 text-red-400' :
                     result.priority === 'high' ? 'bg-amber-500/10 text-amber-400' :
                     result.priority === 'medium' ? 'bg-blue-500/10 text-blue-400' :
-                    'bg-slate-500/10 text-slate-400'
+                    'bg-zinc-500/10 text-zinc-500'
                   }`}>
                     {result.priority}
                   </span>
@@ -170,7 +172,7 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
               ))}
             </div>
           ) : !isLoading ? (
-            <div className="px-3 py-4 text-sm text-slate-500 text-center">
+            <div className="px-3 py-4 text-[13px] text-zinc-600 text-center">
               No issues found for "{query}"
             </div>
           ) : null}
@@ -179,4 +181,3 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
     </div>
   );
 }
-

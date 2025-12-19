@@ -16,47 +16,9 @@ import {
 } from '@dnd-kit/core';
 
 import { IssueCard } from './issue-card';
+import type { Issue, IssueStatus, Column } from './types';
 
-export interface IssueStatus {
-  id: string;
-  name: string;
-  color: string;
-  position: number;
-}
-
-export interface Issue {
-  id: string;
-  number: number;
-  title: string;
-  description: string | null;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  position: number;
-  status: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  assignee?: {
-    id: string;
-    name: string | null;
-    email: string;
-    image: string | null;
-  };
-  labelDetails: Array<{
-    id: string;
-    name: string;
-    color: string;
-  }>;
-  dueDate: string | null;
-  createdAt: string;
-}
-
-interface Column {
-  id: string;
-  name: string;
-  color: string;
-  issues: Issue[];
-}
+export type { Issue, IssueStatus } from './types';
 
 interface KanbanBoardProps {
   statuses: IssueStatus[];
@@ -94,7 +56,7 @@ function DraggableIssue({
       style={style}
       {...listeners}
       {...attributes}
-      className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-40' : ''}`}
+      className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-30' : ''}`}
     >
       <IssueCard issue={issue} workspaceId={workspaceId} projectId={projectId} onClick={onIssueClick} />
     </div>
@@ -129,8 +91,8 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 p-2 space-y-2 overflow-y-auto min-h-[100px] rounded-lg transition-colors ${
-        isOver || isActive ? 'bg-primary-500/10' : ''
+      className={`flex-1 p-2 space-y-1.5 overflow-y-auto min-h-[100px] rounded-lg transition-colors duration-150 ${
+        isOver || isActive ? 'bg-accent-500/5' : ''
       }`}
     >
       {children}
@@ -147,53 +109,22 @@ function BottomDropZone({ columnId, index }: { columnId: string; index: number }
   return (
     <div 
       ref={setNodeRef} 
-      className={`min-h-[40px] rounded-lg transition-colors ${
-        isOver ? 'bg-primary-500/20 border-2 border-dashed border-primary-500/50' : ''
+      className={`min-h-[32px] rounded-lg transition-all duration-150 ${
+        isOver ? 'bg-accent-500/10 border border-dashed border-accent-500/30' : ''
       }`}
     />
   );
 }
 
-// Placeholder card shown during drag - matches IssueCard structure
+// Placeholder card shown during drag - minimal style
 function PlaceholderCard({ issue }: { issue: Issue }) {
   return (
-    <div className="rounded-lg border-2 border-dashed border-primary-500/50 bg-primary-500/10 p-3">
-      {/* Priority indicator line */}
-      <div className="absolute top-0 left-0 w-full h-0.5 opacity-30 bg-primary-400" />
-
-      {/* Header */}
+    <div className="rounded-lg border border-dashed border-accent-500/30 bg-accent-500/5 p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-primary-400/60 text-xs font-mono">#{issue.number}</span>
+        <span className="text-accent-400/50 text-[11px] font-mono">#{issue.number}</span>
       </div>
-
-      {/* Title */}
-      <div className="text-[13px] font-medium text-primary-300 leading-snug line-clamp-2 mb-2">
+      <div className="text-[13px] font-medium text-accent-300/70 leading-snug line-clamp-2">
         {issue.title}
-      </div>
-
-      {/* Labels placeholder */}
-      {issue.labelDetails.length > 0 && (
-        <div className="flex gap-1 mb-2.5">
-          {issue.labelDetails.slice(0, 2).map((label) => (
-            <span key={label.id} className="text-[10px] px-1.5 py-0.5 rounded bg-primary-500/20 text-primary-400">
-              {label.name}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Footer placeholder */}
-      <div className="flex items-center justify-between pt-2 border-t border-primary-500/20">
-        {issue.assignee ? (
-          <div className="flex items-center gap-1.5">
-            <div className="w-5 h-5 rounded-full bg-primary-500/30" />
-            <span className="text-[11px] text-primary-400/60">
-              {issue.assignee.name?.split(' ')[0] || '...'}
-            </span>
-          </div>
-        ) : (
-          <span className="text-[11px] text-primary-400/40 italic">Unassigned</span>
-        )}
       </div>
     </div>
   );
@@ -500,18 +431,18 @@ export function KanbanBoard({
     return (
       <div className="flex gap-3 h-full">
         {columns.map((column) => (
-          <div key={column.id} className="flex flex-col flex-shrink-0 w-72 rounded-xl bg-white/[0.02]">
-            <div className="flex items-center gap-2.5 px-3 py-3 border-b border-white/[0.06]">
+          <div key={column.id} className="flex flex-col flex-shrink-0 w-72 rounded-xl bg-zinc-900/30">
+            <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.04]">
               <div
-                className="w-2.5 h-2.5 rounded-full ring-2 ring-offset-1 ring-offset-transparent"
-                style={{ backgroundColor: column.color, boxShadow: `0 0 8px ${column.color}50` }}
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: column.color }}
               />
-              <span className="font-medium text-sm text-slate-200">{column.name}</span>
-              <span className="text-xs text-slate-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">
+              <span className="font-medium text-[13px] text-zinc-300">{column.name}</span>
+              <span className="text-[11px] text-zinc-600 bg-white/[0.04] px-1.5 py-0.5 rounded-md ml-auto">
                 {column.issues.length}
               </span>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[100px]">
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 min-h-[100px]">
               {column.issues.map((issue) => (
                 <IssueCard key={issue.id} issue={issue} workspaceId={workspaceId} projectId={projectId} onClick={onIssueClick} />
               ))}
@@ -538,18 +469,18 @@ export function KanbanBoard({
           return (
             <div
               key={column.id}
-              className={`flex flex-col flex-shrink-0 w-72 rounded-xl transition-all ${
-                isActive ? 'bg-primary-500/5 ring-1 ring-primary-500/30' : 'bg-white/[0.02]'
+              className={`flex flex-col flex-shrink-0 w-72 rounded-xl transition-all duration-150 ${
+                isActive ? 'bg-accent-500/5 ring-1 ring-accent-500/20' : 'bg-zinc-900/30'
               }`}
             >
               {/* Column Header */}
-              <div className="flex items-center gap-2.5 px-3 py-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.04]">
                 <div
-                  className="w-2.5 h-2.5 rounded-full ring-2 ring-offset-1 ring-offset-transparent"
-                  style={{ backgroundColor: column.color, boxShadow: `0 0 8px ${column.color}50` }}
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: column.color }}
                 />
-                <span className="font-medium text-sm text-slate-200">{column.name}</span>
-                <span className="text-xs text-slate-500 bg-white/[0.06] px-2 py-0.5 rounded-full font-medium">
+                <span className="font-medium text-[13px] text-zinc-300">{column.name}</span>
+                <span className="text-[11px] text-zinc-600 bg-white/[0.04] px-1.5 py-0.5 rounded-md ml-auto">
                   {column.issues.length}
                 </span>
 
@@ -560,11 +491,11 @@ export function KanbanBoard({
                       const title = prompt('Issue title:');
                       if (title) onQuickCreate(title, column.id);
                     }}
-                    className="ml-auto p-1 text-slate-500 hover:text-white hover:bg-white/10 rounded transition-colors"
+                    className="p-1 text-zinc-600 hover:text-zinc-300 hover:bg-white/[0.06] rounded transition-colors"
                     title="Quick add issue"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
                     </svg>
                   </button>
                 )}
@@ -574,7 +505,7 @@ export function KanbanBoard({
                 {renderIssues(column)}
 
                 {column.issues.length === 0 && !dragState.activeId && (
-                  <div className="flex items-center justify-center h-24 text-xs text-slate-500 border border-dashed border-white/10 rounded-lg bg-white/[0.02]">
+                  <div className="flex items-center justify-center h-20 text-[12px] text-zinc-700 border border-dashed border-white/[0.06] rounded-lg">
                     Drop issues here
                   </div>
                 )}
@@ -586,7 +517,7 @@ export function KanbanBoard({
 
       <DragOverlay>
         {draggedIssue && (
-          <div className="w-72 rotate-1 scale-105 shadow-2xl">
+          <div className="w-72 scale-[1.02] shadow-xl shadow-black/20">
             <IssueCard issue={draggedIssue} workspaceId={workspaceId} projectId={projectId} isDragging />
           </div>
         )}

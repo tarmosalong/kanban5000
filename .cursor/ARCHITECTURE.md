@@ -106,6 +106,119 @@ kanban5000/
 - **Color-coded labels** per project
 - **Priority badges** (Urgent, High, Medium, Low)
 
+## Modularity Rules (Spring Modulith Style)
+
+This project enforces architectural boundaries similar to Java's Spring Modulith. Rules are checked via ESLint + `eslint-plugin-boundaries` and `dependency-cruiser`.
+
+### Validation Commands
+
+```bash
+# Check architectural rules
+pnpm arch:validate
+
+# Generate dependency graph (requires graphviz)
+pnpm arch:graph
+
+# Lint backend (includes boundary checks)
+pnpm --filter @kanban5000/backend lint
+```
+
+### Layer Rules
+
+```
+┌─────────────────────────────────────────────┐
+│                  entry                       │
+│              (src/index.ts)                 │
+└─────────────────────┬───────────────────────┘
+                      │ imports
+          ┌───────────┴───────────┐
+          ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐
+│     modules     │     │      infra      │
+│  (src/modules/) │     │   (src/infra/)  │
+└────────┬────────┘     └────────┬────────┘
+         │                       │
+         └───────────┬───────────┘
+                     ▼
+          ┌─────────────────┐
+          │      core       │
+          │   (src/core/)   │
+          │  NO DEPENDENCIES │
+          └─────────────────┘
+```
+
+| From | Can Import | Cannot Import |
+|------|-----------|---------------|
+| `core/` | nothing | modules, infra |
+| `infra/` | core | modules |
+| `modules/` | core, infra | - |
+| `entry` | everything | - |
+
+### Module Isolation Rules
+
+Each feature module (`auth/`, `issue/`, `project/`, etc.) is isolated:
+
+```
+✅ ALLOWED:
+   issue.service.ts → issue.repository.ts
+   issue.controller.ts → issue.service.ts
+   issue.routes.ts → issue.controller.ts
+
+❌ FORBIDDEN:
+   issue.service.ts → project.repository.ts  (cross-module internal)
+   issue.repository.ts → issue.service.ts    (wrong direction)
+```
+
+**Cross-module communication** must go through barrel exports:
+
+```typescript
+// ✅ CORRECT - import from index.ts
+import { ProjectService } from '../project/index.js';
+
+// ❌ WRONG - import internal file
+import { ProjectRepository } from '../project/project.repository.js';
+```
+
+### Internal Layer Rules
+
+Within each module:
+
+```
+routes.ts → controller.ts → service.ts → repository.ts
+    │             │              │              │
+    └─────────────┴──────────────┴──────────────┘
+                         ▼
+                    types.ts
+```
+
+| Layer | Depends On | Never Depends On |
+|-------|-----------|------------------|
+| Controller | Service, Types | Repository, Routes |
+| Service | Repository, Types, other Services | Controller, Routes |
+| Repository | Types | Service, Controller |
+| Routes | Controller, Middleware | Service, Repository |
+
+### Package Boundaries
+
+```
+packages/
+├── backend/    ──┬── Cannot import from ──→ frontend/
+├── frontend/   ──┼── Cannot import from ──→ backend/
+├── api-client/ ──┤  (generated, read-only)
+└── shared/     ──┴── Can be imported by all
+```
+
+### Circular Dependencies
+
+❌ **No circular dependencies allowed** - enforced by dependency-cruiser.
+
+If you need bidirectional communication between modules, use:
+1. Events (loose coupling)
+2. A shared service in a third module
+3. Dependency injection with interfaces
+
+---
+
 ## Architectural Principles
 
 ### 1. Express as HTTP Primitive
