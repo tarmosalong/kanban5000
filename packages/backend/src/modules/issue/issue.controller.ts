@@ -35,6 +35,18 @@ export class IssueController {
   }
 
   /**
+   * GET /issues/my
+   * Get all issues assigned to current user across all projects.
+   */
+  async getUserIssues(
+    req: AppRequest
+  ): Promise<HandlerResult<IssueWithDetails[]>> {
+    this.requireUser(req);
+    const issues = await this.issueService.getUserIssues(req.user.id);
+    return { data: issues };
+  }
+
+  /**
    * GET /issues/:id
    */
   async findById(

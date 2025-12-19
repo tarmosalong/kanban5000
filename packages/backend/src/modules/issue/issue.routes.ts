@@ -161,6 +161,18 @@ export function createIssueRoutes(controller: IssueController): RouteDefinition[
       .handler((req) => controller.list(req)),
 
     route
+      .get('/issues/my')
+      .response(z.array(IssueWithDetailsSchema))
+      .use(requireAuth())
+      .meta({
+        summary: 'List my issues',
+        description: 'List all issues assigned to the current user across all projects',
+        tags: ['Issues'],
+        operationId: 'listMyIssues',
+      })
+      .handler((req) => controller.getUserIssues(req)),
+
+    route
       .get('/projects/:projectId/issues/search')
       .params(ProjectIdParamsSchema)
       .query(SearchQuerySchema)

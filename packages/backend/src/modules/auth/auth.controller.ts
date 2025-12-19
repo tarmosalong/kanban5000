@@ -50,5 +50,31 @@ export class AuthController {
       },
     };
   }
+
+  /**
+   * PUT /auth/profile
+   * Update current user's profile.
+   */
+  async updateProfile(
+    req: AppRequest<{ name?: string | null; image?: string | null }>
+  ): Promise<HandlerResult<{ id: string; email: string; name: string | null; image: string | null }>> {
+    if (!req.user) {
+      throw new Error('Not authenticated');
+    }
+
+    const user = await this.authService.updateProfile(req.user.id, {
+      name: req.body.name,
+      image: req.body.image,
+    });
+
+    return {
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+      },
+    };
+  }
 }
 

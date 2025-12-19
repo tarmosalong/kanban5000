@@ -23,6 +23,7 @@ export interface IIssueRepository {
   findByIdWithDetails(id: string): Promise<IssueWithDetails | null>;
   findByProjectId(projectId: string, filters?: IssueFilters): Promise<Issue[]>;
   findByProjectIdWithDetails(projectId: string, filters?: IssueFilters): Promise<IssueWithDetails[]>;
+  findByAssigneeId(assigneeId: string): Promise<IssueWithDetails[]>;
   create(projectId: string, userId: string, input: CreateIssueInput, defaultStatusId: string): Promise<Issue>;
   update(id: string, userId: string, input: UpdateIssueInput): Promise<Issue>;
   delete(id: string): Promise<void>;
@@ -66,6 +67,7 @@ export class IssueRepository implements IIssueRepository {
       .innerJoin('issue_statuses', 'issue_statuses.id', 'issues.status_id')
       .innerJoin('users as creator', 'creator.id', 'issues.created_by')
       .leftJoin('users as assignee', 'assignee.id', 'issues.assigned_to')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
       .select([
         'issues.id',
         'issues.project_id',
@@ -90,6 +92,9 @@ export class IssueRepository implements IIssueRepository {
         'assignee.name as assignee_name',
         'assignee.email as assignee_email',
         'assignee.image as assignee_image',
+        'projects.name as project_name',
+        'projects.slug as project_slug',
+        'projects.workspace_id as project_workspace_id',
       ])
       .where('issues.id', '=', id)
       .executeTakeFirst();
@@ -128,6 +133,7 @@ export class IssueRepository implements IIssueRepository {
       .innerJoin('issue_statuses', 'issue_statuses.id', 'issues.status_id')
       .innerJoin('users as creator', 'creator.id', 'issues.created_by')
       .leftJoin('users as assignee', 'assignee.id', 'issues.assigned_to')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
       .select([
         'issues.id',
         'issues.project_id',
@@ -152,12 +158,66 @@ export class IssueRepository implements IIssueRepository {
         'assignee.name as assignee_name',
         'assignee.email as assignee_email',
         'assignee.image as assignee_image',
+        'projects.name as project_name',
+        'projects.slug as project_slug',
+        'projects.workspace_id as project_workspace_id',
       ])
       .where('issues.project_id', '=', projectId);
 
     query = this.applyFiltersWithDetails(query, filters);
 
     const rows = await query.execute();
+
+    const issuesWithDetails = await Promise.all(
+      rows.map(async (row) => {
+        const labels = await this.getIssueLabels(row.id);
+        const labelDetails = await this.getLabelDetails(labels);
+        return this.toIssueWithDetailsDomain(row, labels, labelDetails);
+      })
+    );
+
+    return issuesWithDetails;
+  }
+
+  async findByAssigneeId(assigneeId: string): Promise<IssueWithDetails[]> {
+    const rows = await this.db
+      .selectFrom('issues')
+      .innerJoin('issue_statuses', 'issue_statuses.id', 'issues.status_id')
+      .innerJoin('users as creator', 'creator.id', 'issues.created_by')
+      .leftJoin('users as assignee', 'assignee.id', 'issues.assigned_to')
+      .innerJoin('projects', 'projects.id', 'issues.project_id')
+      .select([
+        'issues.id',
+        'issues.project_id',
+        'issues.number',
+        'issues.title',
+        'issues.description',
+        'issues.status_id',
+        'issues.priority',
+        'issues.created_by',
+        'issues.assigned_to',
+        'issues.due_date',
+        'issues.position',
+        'issues.estimated_hours',
+        'issues.custom_fields',
+        'issues.created_at',
+        'issues.updated_at',
+        'issues.closed_at',
+        'issue_statuses.name as status_name',
+        'issue_statuses.color as status_color',
+        'creator.name as creator_name',
+        'creator.email as creator_email',
+        'assignee.name as assignee_name',
+        'assignee.email as assignee_email',
+        'assignee.image as assignee_image',
+        'projects.name as project_name',
+        'projects.slug as project_slug',
+        'projects.workspace_id as project_workspace_id',
+      ])
+      .where('issues.assigned_to', '=', assigneeId)
+      .where('issues.closed_at', 'is', null) // Only show open issues by default
+      .orderBy('issues.created_at', 'desc')
+      .execute();
 
     const issuesWithDetails = await Promise.all(
       rows.map(async (row) => {
@@ -653,6 +713,12 @@ export class IssueRepository implements IIssueRepository {
           }
         : undefined,
       labelDetails,
+      project: row.project_name ? {
+        id: row.project_id,
+        name: row.project_name,
+        slug: row.project_slug,
+        workspaceId: row.project_workspace_id,
+      } : undefined,
     };
   }
 

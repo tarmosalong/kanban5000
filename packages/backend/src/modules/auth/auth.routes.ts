@@ -33,6 +33,18 @@ const AuthMeResponseSchema = z.object({
   roles: z.array(z.string()),
 });
 
+const UpdateProfileInputSchema = z.object({
+  name: z.string().nullable().optional(),
+  image: z.string().url().nullable().optional(),
+});
+
+const UpdateProfileResponseSchema = z.object({
+  id: z.string().uuid(),
+  email: z.string().email(),
+  name: z.string().nullable(),
+  image: z.string().nullable(),
+});
+
 /**
  * Create auth routes.
  */
@@ -61,6 +73,19 @@ export function createAuthRoutes(controller: AuthController): RouteDefinition[] 
         operationId: 'authMe',
       })
       .handler((req) => controller.me(req)),
+
+    route
+      .patch('/auth/profile')
+      .body(UpdateProfileInputSchema)
+      .response(UpdateProfileResponseSchema)
+      .use(requireAuth())
+      .meta({
+        summary: 'Update current user profile',
+        description: 'Updates name and image for the currently authenticated user',
+        tags: ['Auth'],
+        operationId: 'updateProfile',
+      })
+      .handler((req) => controller.updateProfile(req)),
   ];
 }
 

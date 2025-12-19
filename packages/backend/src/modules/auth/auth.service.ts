@@ -10,6 +10,7 @@ import type { IJwtService } from './jwt.service.js';
 export interface IAuthService {
   syncFromOAuth(profile: OAuthProfile): Promise<AuthSyncResult>;
   getCurrentUser(userId: string): Promise<User>;
+  updateProfile(userId: string, data: { name?: string | null; image?: string | null }): Promise<User>;
   can(userId: string, action: string, resource: string, scope?: string): Promise<boolean>;
   requirePermission(userId: string, action: string, resource: string, scope?: string): Promise<void>;
 }
@@ -74,6 +75,18 @@ export class AuthService implements IAuthService {
       throw new NotFoundError('User', userId);
     }
     return user;
+  }
+
+  /**
+   * Update user profile.
+   */
+  async updateProfile(userId: string, data: { name?: string | null; image?: string | null }): Promise<User> {
+    const user = await this.authRepository.findUserById(userId);
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+
+    return this.authRepository.updateUser(userId, data);
   }
 
   /**

@@ -31,9 +31,23 @@ export function AuthNav({ user, signOutAction }: AuthNavProps) {
           <div className="hidden sm:flex items-center gap-1">
             <Link
               href="/workspaces"
-              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                pathname === '/workspaces' 
+                  ? 'text-white bg-white/10' 
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
             >
               Workspaces
+            </Link>
+            <Link
+              href="/my-issues"
+              className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                pathname === '/my-issues' 
+                  ? 'text-white bg-white/10' 
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              My Issues
             </Link>
           </div>
         </div>
@@ -47,7 +61,14 @@ export function AuthNav({ user, signOutAction }: AuthNavProps) {
 
         {/* Right */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+          <Link
+            href="/profile"
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${
+              pathname === '/profile'
+                ? 'bg-white/10 text-white'
+                : 'hover:bg-white/5 text-slate-300'
+            }`}
+          >
             {user.image ? (
               <img
                 src={user.image}
@@ -59,10 +80,10 @@ export function AuthNav({ user, signOutAction }: AuthNavProps) {
                 {(user.name || user.email || 'U')[0].toUpperCase()}
               </div>
             )}
-            <span className="text-sm text-slate-300 hidden sm:block">
+            <span className="text-sm hidden sm:block">
               {user.name || user.email?.split('@')[0]}
             </span>
-          </div>
+          </Link>
           <form action={signOutAction}>
             <button
               type="submit"

@@ -19,6 +19,7 @@ import type {
  */
 export interface IIssueService {
   list(userId: string, projectId: string, filters?: IssueFilters): Promise<IssueWithDetails[]>;
+  getUserIssues(userId: string): Promise<IssueWithDetails[]>;
   findById(userId: string, id: string): Promise<IssueWithDetails>;
   create(userId: string, projectId: string, input: CreateIssueInput): Promise<Issue>;
   update(userId: string, id: string, input: UpdateIssueInput): Promise<Issue>;
@@ -51,6 +52,10 @@ export class IssueService implements IIssueService {
   async list(userId: string, projectId: string, filters?: IssueFilters): Promise<IssueWithDetails[]> {
     await this.requireProjectAccess(userId, projectId);
     return this.issueRepository.findByProjectIdWithDetails(projectId, filters);
+  }
+
+  async getUserIssues(userId: string): Promise<IssueWithDetails[]> {
+    return this.issueRepository.findByAssigneeId(userId);
   }
 
   async findById(userId: string, id: string): Promise<IssueWithDetails> {

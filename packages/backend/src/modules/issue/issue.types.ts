@@ -1,4 +1,30 @@
 /**
+ * Issue relation types.
+ */
+export type IssueRelationType = 'relates_to' | 'blocks' | 'blocked_by' | 'parent_of' | 'child_of';
+
+/**
+ * Issue relation domain model.
+ */
+export interface IssueRelation {
+  id: string;
+  sourceIssueId: string;
+  targetIssueId: string;
+  relationType: IssueRelationType;
+  createdAt: Date;
+  // Detail info for the target/related issue
+  issue?: {
+    id: string;
+    number: number;
+    title: string;
+    status: {
+      name: string;
+      color: string;
+    };
+  };
+}
+
+/**
  * Issue priority levels.
  */
 export type IssuePriority = 'low' | 'medium' | 'high' | 'urgent';
@@ -51,6 +77,13 @@ export interface IssueWithDetails extends Issue {
     name: string;
     color: string;
   }>;
+  project?: {
+    id: string;
+    name: string;
+    slug: string;
+    workspaceId: string;
+  };
+  relations: IssueRelation[];
 }
 
 /**

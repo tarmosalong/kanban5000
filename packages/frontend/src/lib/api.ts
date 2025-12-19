@@ -132,6 +132,13 @@ export const api = {
   // Auth
   auth: {
     me: () => api.client.get<{ id: string; email: string; name: string | null; image: string | null; roles: string[] }>('/auth/me'),
+    updateProfile: (data: { name?: string | null; image?: string | null }) =>
+      api.client.patch<{ id: string; email: string; name: string | null; image: string | null }>('/auth/profile', data),
+  },
+
+  // Issues
+  issues: {
+    my: () => api.client.get<any[]>('/issues/my'), // Use any for now, types will be inferred or defined elsewhere
   },
 
   // Workspaces

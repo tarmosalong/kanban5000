@@ -38,6 +38,16 @@ export function NavBar({ user }: NavBarProps) {
             >
               Workspaces
             </Link>
+            <Link
+              href="/my-issues"
+              className={`px-2.5 py-1.5 text-[13px] rounded-md transition-colors ${
+                pathname === '/my-issues' 
+                  ? 'text-white bg-white/[0.06]' 
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.03]'
+              }`}
+            >
+              My Issues
+            </Link>
           </div>
         </div>
 
@@ -50,7 +60,14 @@ export function NavBar({ user }: NavBarProps) {
 
         {/* Right */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.03] transition-colors cursor-default">
+          <Link
+            href="/profile"
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${
+              pathname === '/profile'
+                ? 'bg-white/[0.06] text-white'
+                : 'hover:bg-white/[0.03] text-zinc-400'
+            }`}
+          >
             {user.image ? (
               <img
                 src={user.image}
@@ -62,10 +79,10 @@ export function NavBar({ user }: NavBarProps) {
                 {(user.name || user.email || 'U')[0].toUpperCase()}
               </div>
             )}
-            <span className="text-[13px] text-zinc-400 hidden sm:block">
+            <span className="text-[13px] hidden sm:block">
               {user.name || user.email?.split('@')[0]}
             </span>
-          </div>
+          </Link>
           <div className="w-px h-4 bg-white/[0.06] mx-1" />
           <form action="/api/auth/signout" method="POST">
             <button
