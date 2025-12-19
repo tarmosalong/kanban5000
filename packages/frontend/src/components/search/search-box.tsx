@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { getProjectKey } from '@/lib/issue-key';
 
 interface SearchResult {
   id: string;
@@ -21,6 +22,7 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [projectContext, setProjectContext] = useState<{ workspaceId: string; projectId: string } | null>(null);
+  const [projectKey, setProjectKey] = useState('PROJ');
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -33,8 +35,23 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
       setProjectContext({ workspaceId: match[1], projectId: match[2] });
     } else {
       setProjectContext(null);
+      setProjectKey('PROJ');
     }
   }, [pathname]);
+
+  // Fetch project slug for the key
+  useEffect(() => {
+    if (!projectContext) return;
+    
+    fetch(`/api/projects/${projectContext.projectId}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.data?.slug) {
+          setProjectKey(getProjectKey(data.data.slug));
+        }
+      })
+      .catch(() => {});
+  }, [projectContext]);
 
   // Debounced search
   useEffect(() => {
@@ -158,7 +175,7 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
                   onClick={() => handleResultClick(result)}
                   className="w-full px-3 py-2 text-left hover:bg-white/[0.04] transition-colors flex items-center gap-3"
                 >
-                  <span className="text-zinc-600 text-[11px] font-mono">#{result.number}</span>
+                  <span className="text-zinc-600 text-[11px] font-mono">{projectKey}-{result.number}</span>
                   <span className="text-[13px] text-zinc-300 truncate flex-1">{result.title}</span>
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                     result.priority === 'urgent' ? 'bg-red-500/10 text-red-400' :

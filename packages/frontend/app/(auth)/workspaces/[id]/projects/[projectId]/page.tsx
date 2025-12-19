@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { Button, useToast } from '@/components/ui';
 import { KanbanBoard, type Issue, type IssueStatus } from '@/components/kanban';
 import { IssuePreviewPanel } from '@/components/issue';
+import { getProjectKey } from '@/lib/issue-key';
 
 interface Project {
   id: string;
@@ -514,6 +515,7 @@ export default function ProjectPage() {
                 issues={filteredIssues}
                 workspaceId={workspaceId}
                 projectId={projectId}
+                projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
                 onIssueMove={handleIssueMove}
                 onQuickCreate={handleQuickCreate}
                 onIssueClick={setSelectedIssue}
@@ -526,6 +528,7 @@ export default function ProjectPage() {
             statuses={statuses}
             workspaceId={workspaceId}
             projectId={projectId}
+            projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
             onIssueClick={setSelectedIssue}
           />
         )}
@@ -536,6 +539,7 @@ export default function ProjectPage() {
         issue={selectedIssue}
         workspaceId={workspaceId}
         projectId={projectId}
+        projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
         onClose={() => setSelectedIssue(null)}
       />
     </div>
@@ -548,12 +552,14 @@ function IssueListView({
   statuses,
   workspaceId, 
   projectId,
+  projectKey,
   onIssueClick,
 }: { 
   issues: Issue[]; 
   statuses: IssueStatus[];
   workspaceId: string; 
   projectId: string;
+  projectKey: string;
   onIssueClick?: (issue: Issue) => void;
 }) {
   const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
@@ -588,7 +594,7 @@ function IssueListView({
                 className="hover:bg-white/[0.02] transition-colors group"
               >
                 <td className="px-4 py-3">
-                  <span className="text-slate-500 font-mono text-sm">#{issue.number}</span>
+                  <span className="text-slate-500 font-mono text-sm">{projectKey}-{issue.number}</span>
                 </td>
                 <td className="px-4 py-3">
                   <button

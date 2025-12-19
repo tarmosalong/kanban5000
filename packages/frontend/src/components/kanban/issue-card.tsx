@@ -13,6 +13,7 @@ interface IssueCardProps {
   issue: Issue;
   workspaceId: string;
   projectId: string;
+  projectKey: string;
   isDragging?: boolean;
   onClick?: (issue: Issue) => void;
 }
@@ -59,6 +60,7 @@ export function IssueCard({
   issue,
   workspaceId,
   projectId,
+  projectKey,
   isDragging,
   onClick,
 }: IssueCardProps) {
@@ -85,7 +87,7 @@ export function IssueCard({
         {/* Header: Number & Priority */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-zinc-600 text-[11px] font-mono">
-            #{issue.number}
+            {projectKey}-{issue.number}
           </span>
           <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${priority.bg} ${priority.text}`}>
             {priority.label}

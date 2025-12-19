@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { Button, Card, Markdown, useToast } from '@/components/ui';
+import { getProjectKey } from '@/lib/issue-key';
 
 interface Label {
   id: string;
@@ -106,6 +107,7 @@ export default function IssuePage() {
   const [statuses, setStatuses] = useState<IssueStatus[]>([]);
   const [projectLabels, setProjectLabels] = useState<Label[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [projectSlug, setProjectSlug] = useState<string>('');
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -124,12 +126,13 @@ export default function IssuePage() {
 
   async function fetchData() {
     try {
-      const [issueRes, commentsRes, statusesRes, labelsRes, membersRes] = await Promise.all([
+      const [issueRes, commentsRes, statusesRes, labelsRes, membersRes, projectRes] = await Promise.all([
         fetch(`/api/issues/${issueId}`),
         fetch(`/api/issues/${issueId}/comments`),
         fetch(`/api/projects/${projectId}/statuses`),
         fetch(`/api/projects/${projectId}/labels`),
         fetch(`/api/workspaces/${workspaceId}/members`),
+        fetch(`/api/projects/${projectId}`),
       ]);
 
       const issueData = await issueRes.json();
@@ -137,12 +140,14 @@ export default function IssuePage() {
       const statusesData = await statusesRes.json();
       const labelsData = await labelsRes.json();
       const membersData = await membersRes.json();
+      const projectData = await projectRes.json();
 
       setIssue(issueData.data);
       setComments(commentsData.data || []);
       setStatuses(statusesData.data || []);
       setProjectLabels(labelsData.data || []);
       setMembers(membersData.data || []);
+      setProjectSlug(projectData.data?.slug || '');
 
       // Fetch history separately to avoid blocking main data
       try {
@@ -385,7 +390,7 @@ export default function IssuePage() {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-3">
-          <span className="text-slate-500 font-mono text-sm">#{issue.number}</span>
+          <span className="text-slate-500 font-mono text-sm">{projectSlug ? getProjectKey(projectSlug) : 'PROJ'}-{issue.number}</span>
           <span
             className="px-2 py-0.5 rounded text-xs font-medium"
             style={{

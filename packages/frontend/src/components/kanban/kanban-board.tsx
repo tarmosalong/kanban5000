@@ -25,6 +25,7 @@ interface KanbanBoardProps {
   issues: Issue[];
   workspaceId: string;
   projectId: string;
+  projectKey: string;
   onIssueMove: (issueId: string, newStatusId: string, position: number) => Promise<void>;
   onQuickCreate?: (title: string, statusId: string) => Promise<void>;
   onIssueClick?: (issue: Issue) => void;
@@ -34,13 +35,15 @@ interface KanbanBoardProps {
 function DraggableIssue({ 
   issue, 
   workspaceId, 
-  projectId, 
+  projectId,
+  projectKey,
   isDragging,
   onIssueClick,
 }: { 
   issue: Issue; 
   workspaceId: string; 
   projectId: string;
+  projectKey: string;
   isDragging: boolean;
   onIssueClick?: (issue: Issue) => void;
 }) {
@@ -58,7 +61,7 @@ function DraggableIssue({
       {...attributes}
       className={`cursor-grab active:cursor-grabbing touch-none ${isDragging ? 'opacity-30' : ''}`}
     >
-      <IssueCard issue={issue} workspaceId={workspaceId} projectId={projectId} onClick={onIssueClick} />
+      <IssueCard issue={issue} workspaceId={workspaceId} projectId={projectId} projectKey={projectKey} onClick={onIssueClick} />
     </div>
   );
 }
@@ -117,11 +120,11 @@ function BottomDropZone({ columnId, index }: { columnId: string; index: number }
 }
 
 // Placeholder card shown during drag - minimal style
-function PlaceholderCard({ issue }: { issue: Issue }) {
+function PlaceholderCard({ issue, projectKey }: { issue: Issue; projectKey: string }) {
   return (
     <div className="rounded-lg border border-dashed border-accent-500/30 bg-accent-500/5 p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-accent-400/50 text-[11px] font-mono">#{issue.number}</span>
+        <span className="text-accent-400/50 text-[11px] font-mono">{projectKey}-{issue.number}</span>
       </div>
       <div className="text-[13px] font-medium text-accent-300/70 leading-snug line-clamp-2">
         {issue.title}
@@ -135,6 +138,7 @@ export function KanbanBoard({
   issues,
   workspaceId,
   projectId,
+  projectKey,
   onIssueMove,
   onQuickCreate,
   onIssueClick,
@@ -351,6 +355,7 @@ export function KanbanBoard({
             issue={issue}
             workspaceId={workspaceId}
             projectId={projectId}
+            projectKey={projectKey}
             isDragging={issue.id === activeId}
             onIssueClick={onIssueClick}
           />
@@ -383,13 +388,13 @@ export function KanbanBoard({
           // Account for the fact that dragged item is still in array
           const targetVisualIndex = overIndex > currentIndex ? overIndex - 1 : overIndex;
           if (!isDragging && visualIndex === targetVisualIndex && currentIndex !== overIndex) {
-            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
+            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
             placeholderInserted = true;
           }
         } else {
           // Different column - insert at overIndex
           if (index === overIndex) {
-            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
+            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
             placeholderInserted = true;
           }
         }
@@ -401,6 +406,7 @@ export function KanbanBoard({
             issue={issue}
             workspaceId={workspaceId}
             projectId={projectId}
+            projectKey={projectKey}
             isDragging={isDragging}
             onIssueClick={onIssueClick}
           />
@@ -414,12 +420,12 @@ export function KanbanBoard({
         // Same column, moving to end
         const effectiveLength = column.issues.length - 1; // exclude dragged item
         if (overIndex >= column.issues.length || (overIndex > currentIndex && overIndex >= effectiveLength)) {
-          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
+          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
         }
       } else {
         // Different column, at end
         if (overIndex >= column.issues.length) {
-          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} />);
+          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
         }
       }
     }
@@ -444,7 +450,7 @@ export function KanbanBoard({
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5 min-h-[100px]">
               {column.issues.map((issue) => (
-                <IssueCard key={issue.id} issue={issue} workspaceId={workspaceId} projectId={projectId} onClick={onIssueClick} />
+                <IssueCard key={issue.id} issue={issue} workspaceId={workspaceId} projectId={projectId} projectKey={projectKey} onClick={onIssueClick} />
               ))}
             </div>
           </div>
@@ -518,7 +524,7 @@ export function KanbanBoard({
       <DragOverlay>
         {draggedIssue && (
           <div className="w-72 scale-[1.02] shadow-xl shadow-black/20">
-            <IssueCard issue={draggedIssue} workspaceId={workspaceId} projectId={projectId} isDragging />
+            <IssueCard issue={draggedIssue} workspaceId={workspaceId} projectId={projectId} projectKey={projectKey} isDragging />
           </div>
         )}
       </DragOverlay>

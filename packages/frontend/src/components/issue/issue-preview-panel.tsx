@@ -10,6 +10,7 @@ interface IssuePreviewPanelProps {
   issue: Issue | null;
   workspaceId: string;
   projectId: string;
+  projectKey: string;
   onClose: () => void;
 }
 
@@ -23,7 +24,8 @@ const PRIORITY_CONFIG = {
 export function IssuePreviewPanel({ 
   issue, 
   workspaceId, 
-  projectId, 
+  projectId,
+  projectKey,
   onClose 
 }: IssuePreviewPanelProps) {
   const router = useRouter();
@@ -67,7 +69,7 @@ export function IssuePreviewPanel({
         <div className="flex-shrink-0 px-5 py-4 border-b border-white/[0.04]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-zinc-600 font-mono text-[12px]">#{issue.number}</span>
+              <span className="text-zinc-600 font-mono text-[12px]">{projectKey}-{issue.number}</span>
               <span 
                 className="text-[11px] font-medium px-2 py-0.5 rounded-md"
                 style={{
