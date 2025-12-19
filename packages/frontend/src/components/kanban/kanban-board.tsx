@@ -94,39 +94,39 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-1 p-2 space-y-1.5 overflow-y-auto min-h-[100px] rounded-lg transition-colors duration-150 ${
+      className={`flex-1 p-2 space-y-1.5 overflow-y-auto min-h-[200px] rounded-lg transition-colors duration-150 ${
         isOver || isActive ? 'bg-accent-500/5' : ''
       }`}
     >
       {children}
-      {/* Bottom drop zone */}
+      {/* Bottom drop zone for "add to end" */}
       <BottomDropZone columnId={columnId} index={issueCount} />
     </div>
   );
 }
 
-// Drop zone at bottom of column for "add to end"
+// Drop zone at bottom of column
 function BottomDropZone({ columnId, index }: { columnId: string; index: number }) {
   const { setNodeRef, isOver } = useDroppable({ id: `bottom:${columnId}:${index}` });
 
   return (
     <div 
       ref={setNodeRef} 
-      className={`min-h-[32px] rounded-lg transition-all duration-150 ${
+      className={`min-h-[40px] rounded-lg transition-all duration-150 ${
         isOver ? 'bg-accent-500/10 border border-dashed border-accent-500/30' : ''
       }`}
     />
   );
 }
 
-// Placeholder card shown during drag - minimal style
+// Placeholder card shown during drag
 function PlaceholderCard({ issue, projectKey }: { issue: Issue; projectKey: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-accent-500/30 bg-accent-500/5 p-3">
+    <div className="rounded-lg border border-dashed border-accent-500/40 bg-accent-500/10 p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-accent-400/50 text-[11px] font-mono">{projectKey}-{issue.number}</span>
+        <span className="text-accent-400/60 text-[11px] font-mono">{projectKey}-{issue.number}</span>
       </div>
-      <div className="text-[13px] font-medium text-accent-300/70 leading-snug line-clamp-2">
+      <div className="text-[13px] font-medium text-accent-300/80 leading-snug line-clamp-2">
         {issue.title}
       </div>
     </div>
@@ -159,7 +159,7 @@ export function KanbanBoard({
   
   const [columns, setColumns] = useState<Column[]>(buildColumns);
 
-  // Drag state
+  // Simple drag state
   const [dragState, setDragState] = useState<{
     activeId: string | null;
     activeColumnId: string | null;
@@ -180,7 +180,7 @@ export function KanbanBoard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
+      activationConstraint: { distance: 8 },
     })
   );
 
@@ -212,7 +212,6 @@ export function KanbanBoard({
       overIndex: index,
     });
     lastOverRef.current = null;
-    document.body.style.cursor = 'grabbing';
   }
 
   function handleDragOver(event: DragOverEvent) {
@@ -240,7 +239,7 @@ export function KanbanBoard({
       const column = columns.find(c => c.id === targetColumnId);
       targetIndex = column ? column.issues.length : 0;
     } else {
-      // Dropping on another issue
+      // Dropping on another issue - just get the index, no adjustment
       const columnId = getColumnId(overId);
       if (!columnId) return;
       targetColumnId = columnId;
@@ -262,26 +261,12 @@ export function KanbanBoard({
 
     setDragState({ activeId: null, activeColumnId: null, overColumnId: null, overIndex: 0 });
     lastOverRef.current = null;
-    document.body.style.cursor = '';
 
     if (!activeId || !activeColumnId || !overColumnId) return;
 
     const activeIssue = getIssue(activeId);
     if (!activeIssue) return;
 
-    // Calculate the actual new position
-    let newPosition = overIndex;
-    
-    // If moving within same column, adjust for the removed item
-    if (activeColumnId === overColumnId) {
-      const column = columns.find(c => c.id === activeColumnId);
-      const currentIndex = column?.issues.findIndex(i => i.id === activeId) ?? 0;
-      if (overIndex > currentIndex) {
-        newPosition = overIndex - 1;
-      }
-    }
-
-    // Optimistic update
     let newColumns: Column[];
 
     if (activeColumnId === overColumnId) {
@@ -289,15 +274,16 @@ export function KanbanBoard({
       newColumns = columns.map(col => {
         if (col.id !== activeColumnId) return col;
 
-        const issues = [...col.issues];
-        const currentIndex = issues.findIndex(i => i.id === activeId);
-        if (currentIndex === -1) return col;
+        const colIssues = [...col.issues];
+        const currentIndex = colIssues.findIndex(i => i.id === activeId);
+        if (currentIndex === -1 || currentIndex === overIndex) return col;
 
-        const [removed] = issues.splice(currentIndex, 1);
-        const insertIndex = overIndex > currentIndex ? overIndex - 1 : overIndex;
-        issues.splice(Math.max(0, Math.min(insertIndex, issues.length)), 0, removed);
+        const [removed] = colIssues.splice(currentIndex, 1);
+        // When dragging down, account for the removed item
+        const newIndex = overIndex > currentIndex ? overIndex - 1 : overIndex;
+        colIssues.splice(Math.max(0, Math.min(newIndex, colIssues.length)), 0, removed);
 
-        return { ...col, issues };
+        return { ...col, issues: colIssues };
       });
     } else {
       // Move to different column
@@ -309,13 +295,13 @@ export function KanbanBoard({
           return { ...col, issues: col.issues.filter(i => i.id !== activeId) };
         }
         if (col.id === overColumnId) {
-          const issues = [...col.issues];
+          const colIssues = [...col.issues];
           const movedIssue = {
             ...activeIssue,
             status: { id: targetStatus.id, name: targetStatus.name, color: targetStatus.color },
           };
-          issues.splice(Math.min(overIndex, issues.length), 0, movedIssue);
-          return { ...col, issues };
+          colIssues.splice(Math.min(overIndex, colIssues.length), 0, movedIssue);
+          return { ...col, issues: colIssues };
         }
         return col;
       });
@@ -323,9 +309,13 @@ export function KanbanBoard({
 
     setColumns(newColumns);
 
+    // Calculate position for backend
+    const targetColumn = newColumns.find(c => c.id === overColumnId);
+    const finalPosition = targetColumn?.issues.findIndex(i => i.id === activeId) ?? 0;
+
     // Persist to backend
     try {
-      await onIssueMove(activeId, overColumnId, newPosition);
+      await onIssueMove(activeId, overColumnId, finalPosition);
     } catch (error) {
       // Revert on error
       setColumns(buildColumns());
@@ -335,7 +325,6 @@ export function KanbanBoard({
   function handleDragCancel() {
     setDragState({ activeId: null, activeColumnId: null, overColumnId: null, overIndex: 0 });
     lastOverRef.current = null;
-    document.body.style.cursor = '';
   }
 
   const draggedIssue = dragState.activeId ? getIssue(dragState.activeId) : null;
@@ -347,57 +336,19 @@ export function KanbanBoard({
     const isTargetColumn = overColumnId === column.id;
     const activeIssue = activeId ? getIssue(activeId) : null;
 
-    if (!isTargetColumn || !activeIssue) {
-      // No dragging to this column - just render normally
-      return column.issues.map((issue) => (
-        <DroppableIssueZone key={issue.id} issueId={issue.id}>
-          <DraggableIssue
-            issue={issue}
-            workspaceId={workspaceId}
-            projectId={projectId}
-            projectKey={projectKey}
-            isDragging={issue.id === activeId}
-            onIssueClick={onIssueClick}
-          />
-        </DroppableIssueZone>
-      ));
-    }
-
     const items: React.ReactNode[] = [];
-    const currentIndex = isSourceColumn 
-      ? column.issues.findIndex(i => i.id === activeId) 
-      : -1;
-
-    // For same column: calculate effective index without the dragged item
-    // For different column: just use overIndex directly
-    let placeholderInserted = false;
 
     column.issues.forEach((issue, index) => {
       const isDragging = issue.id === activeId;
 
-      // Calculate the visual index (excluding dragged item for same column)
-      let visualIndex = index;
-      if (isSourceColumn && currentIndex !== -1 && index > currentIndex) {
-        visualIndex = index - 1;
-      }
-
-      // Insert placeholder at the right position
-      if (!placeholderInserted) {
-        if (isSourceColumn) {
-          // Same column - show placeholder at target position
-          // Account for the fact that dragged item is still in array
-          const targetVisualIndex = overIndex > currentIndex ? overIndex - 1 : overIndex;
-          if (!isDragging && visualIndex === targetVisualIndex && currentIndex !== overIndex) {
-            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
-            placeholderInserted = true;
-          }
-        } else {
-          // Different column - insert at overIndex
-          if (index === overIndex) {
-            items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
-            placeholderInserted = true;
-          }
-        }
+      // Show placeholder BEFORE this issue when:
+      // - This is the target column
+      // - This is NOT the source column (different column drop)
+      // - We're at the overIndex position
+      if (isTargetColumn && !isSourceColumn && index === overIndex && activeIssue) {
+        items.push(
+          <PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />
+        );
       }
 
       items.push(
@@ -414,20 +365,11 @@ export function KanbanBoard({
       );
     });
 
-    // Placeholder at end if not yet inserted
-    if (!placeholderInserted && isTargetColumn) {
-      if (isSourceColumn) {
-        // Same column, moving to end
-        const effectiveLength = column.issues.length - 1; // exclude dragged item
-        if (overIndex >= column.issues.length || (overIndex > currentIndex && overIndex >= effectiveLength)) {
-          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
-        }
-      } else {
-        // Different column, at end
-        if (overIndex >= column.issues.length) {
-          items.push(<PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />);
-        }
-      }
+    // Placeholder at end of different column
+    if (isTargetColumn && !isSourceColumn && overIndex >= column.issues.length && activeIssue) {
+      items.push(
+        <PlaceholderCard key="placeholder" issue={activeIssue} projectKey={projectKey} />
+      );
     }
 
     return items;
@@ -523,7 +465,7 @@ export function KanbanBoard({
 
       <DragOverlay>
         {draggedIssue && (
-          <div className="w-72 scale-[1.02] shadow-xl shadow-black/20">
+          <div className="w-72 rotate-1 scale-105 shadow-2xl">
             <IssueCard issue={draggedIssue} workspaceId={workspaceId} projectId={projectId} projectKey={projectKey} isDragging />
           </div>
         )}

@@ -22,7 +22,7 @@
     background: var(--color-surface);
   }
 
-  /* Subtle background pattern */
+  /* Subtle background pattern - very muted */
   body::before {
     content: '';
     position: fixed;
@@ -31,8 +31,8 @@
     right: 0;
     bottom: 0;
     background: 
-      radial-gradient(ellipse 100% 60% at 50% -30%, rgba(45, 212, 191, 0.04), transparent),
-      radial-gradient(circle at 0% 100%, rgba(45, 212, 191, 0.02), transparent 50%);
+      radial-gradient(ellipse 100% 60% at 50% -30%, rgba(79, 209, 181, 0.025), transparent),
+      radial-gradient(circle at 0% 100%, rgba(79, 209, 181, 0.015), transparent 50%);
     pointer-events: none;
     z-index: -1;
   }
@@ -59,12 +59,12 @@
   /* Focus styles - Subtle ring */
   *:focus-visible {
     @apply outline-none;
-    box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.25);
+    box-shadow: 0 0 0 2px rgba(79, 209, 181, 0.2);
   }
 
   /* Selection */
   ::selection {
-    background: rgba(45, 212, 191, 0.2);
+    background: rgba(79, 209, 181, 0.15);
     color: var(--color-text-primary);
   }
 }
@@ -81,15 +81,15 @@
 
   .btn-primary {
     @apply text-zinc-900;
-    background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%), 
+    background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 100%), 
                 var(--color-accent-400);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.15);
   }
 
   .btn-primary:hover {
-    background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(255,255,255,0) 100%), 
+    background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%), 
                 var(--color-accent-300);
-    box-shadow: 0 2px 8px rgba(45, 212, 191, 0.25), inset 0 1px 0 rgba(255,255,255,0.2);
+    box-shadow: 0 2px 8px rgba(79, 209, 181, 0.2), inset 0 1px 0 rgba(255,255,255,0.15);
   }
 
   .btn-secondary {
@@ -123,9 +123,9 @@
   }
 
   .input:focus {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.04);
     border-color: var(--color-border-accent);
-    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.08);
+    box-shadow: 0 0 0 3px rgba(79, 209, 181, 0.06);
     outline: none;
   }
 

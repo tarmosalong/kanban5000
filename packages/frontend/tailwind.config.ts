@@ -8,18 +8,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Accent color - Teal for interactive elements
+        // Accent color - Muted teal, easier on eyes
         accent: {
           50: '#f0fdfa',
           100: '#ccfbf1',
           200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
+          300: '#6ee7c2',
+          400: '#4fd1b5',
+          500: '#38b2a0',
+          600: '#2d9488',
+          700: '#257a70',
         },
-        // Keep primary as zinc-based for minimalist look
+        // Primary - Soft zinc
         primary: {
           50: '#fafafa',
           100: '#f4f4f5',
@@ -31,18 +31,18 @@ const config: Config = {
           700: '#3f3f46',
           800: '#27272a',
           900: '#18181b',
-          950: '#09090b',
+          950: '#0c0d10',
         },
         surface: {
-          DEFAULT: '#09090b',
-          elevated: '#18181b',
-          overlay: '#27272a',
-          card: 'rgba(24, 24, 27, 0.6)',
+          DEFAULT: '#0c0d10',
+          elevated: '#15171c',
+          overlay: '#1e2128',
+          card: 'rgba(21, 23, 28, 0.7)',
         },
         border: {
-          DEFAULT: 'rgba(255, 255, 255, 0.06)',
-          subtle: 'rgba(255, 255, 255, 0.03)',
-          hover: 'rgba(255, 255, 255, 0.1)',
+          DEFAULT: 'rgba(255, 255, 255, 0.07)',
+          subtle: 'rgba(255, 255, 255, 0.04)',
+          hover: 'rgba(255, 255, 255, 0.12)',
         },
       },
       fontFamily: {
@@ -78,12 +78,12 @@ const config: Config = {
         xl: '16px',
       },
       boxShadow: {
-        'xs': '0 1px 2px rgba(0, 0, 0, 0.05)',
-        'sm': '0 2px 8px rgba(0, 0, 0, 0.08)',
-        'md': '0 4px 16px rgba(0, 0, 0, 0.12)',
-        'lg': '0 8px 32px rgba(0, 0, 0, 0.16)',
-        'glow': '0 0 60px rgba(45, 212, 191, 0.08)',
-        'glow-accent': '0 0 20px rgba(45, 212, 191, 0.15)',
+        'xs': '0 1px 2px rgba(0, 0, 0, 0.06)',
+        'sm': '0 2px 8px rgba(0, 0, 0, 0.1)',
+        'md': '0 4px 16px rgba(0, 0, 0, 0.14)',
+        'lg': '0 8px 32px rgba(0, 0, 0, 0.18)',
+        'glow': '0 0 60px rgba(79, 209, 181, 0.05)',
+        'glow-accent': '0 0 20px rgba(79, 209, 181, 0.1)',
       },
       animation: {
         'in': 'fadeIn 0.3s ease-out forwards',
