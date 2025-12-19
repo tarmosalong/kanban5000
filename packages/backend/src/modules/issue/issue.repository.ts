@@ -421,14 +421,33 @@ export class IssueRepository implements IIssueRepository {
   // Search
 
   async searchIssues(projectId: string, query: string, limit = 20): Promise<Issue[]> {
-    const rows = await this.db
-      .selectFrom('issues')
-      .selectAll()
-      .where('project_id', '=', projectId)
-      .where(sql`search_vector @@ plainto_tsquery('english', ${query})`)
-      .orderBy(sql`ts_rank(search_vector, plainto_tsquery('english', ${query}))`, 'desc')
-      .limit(limit)
-      .execute();
+    // Extract issue number from query (supports "123", "BACK-123", "back-123")
+    const numberMatch = query.match(/^(?:[a-zA-Z]+-)?(\d+)$/);
+    const issueNumber = numberMatch ? parseInt(numberMatch[1], 10) : null;
+
+    let rows;
+    const likePattern = `%${query}%`;
+    
+    if (issueNumber !== null) {
+      // Search by issue number (exact match)
+      rows = await this.db
+        .selectFrom('issues')
+        .selectAll()
+        .where('project_id', '=', projectId)
+        .where('number', '=', issueNumber)
+        .limit(limit)
+        .execute();
+    } else {
+      // Partial text search using ILIKE on title
+      rows = await this.db
+        .selectFrom('issues')
+        .selectAll()
+        .where('project_id', '=', projectId)
+        .where('title', 'ilike', likePattern)
+        .orderBy('created_at', 'desc')
+        .limit(limit)
+        .execute();
+    }
 
     const issuesWithLabels = await Promise.all(
       rows.map(async (row) => {
