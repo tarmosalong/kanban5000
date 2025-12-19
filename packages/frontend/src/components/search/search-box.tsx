@@ -96,14 +96,9 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Keyboard shortcut (Cmd/Ctrl + K)
+  // Close on Escape
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
-        event.preventDefault();
-        inputRef.current?.focus();
-        setIsOpen(true);
-      }
       if (event.key === 'Escape') {
         setIsOpen(false);
         inputRef.current?.blur();
@@ -154,12 +149,10 @@ export function SearchBox({ className = '' }: SearchBoxProps) {
             d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
           />
         </svg>
-        {/* Keyboard shortcut hint */}
+        {/* Keyboard shortcut hint - removed since we have global palette */}
         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-0.5">
-          {isLoading ? (
+          {isLoading && (
             <div className="w-3.5 h-3.5 border-[1.5px] border-zinc-700 border-t-accent-400 rounded-full animate-spin" />
-          ) : (
-            <kbd className="text-[10px] text-zinc-600 bg-white/[0.04] px-1 py-0.5 rounded border border-white/[0.06]">⌘K</kbd>
           )}
         </div>
       </div>

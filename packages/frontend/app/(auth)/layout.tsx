@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { auth, signOut } from '@/lib/auth';
 import { AuthNav } from './auth-nav';
+import { GlobalCommandPalette } from '@/components/ui';
 
 export default async function AuthLayout({
   children,
@@ -21,6 +22,7 @@ export default async function AuthLayout({
 
   return (
     <div className="min-h-screen">
+      <GlobalCommandPalette />
       <AuthNav 
         user={{
           name: session.user?.name,

@@ -11,6 +11,9 @@ export { Toaster, useToast, toast } from './toast';
 
 export { Markdown } from './markdown';
 
+export { CommandPalette } from './command-palette';
+export { GlobalCommandPalette } from './global-command-palette';
+
 export { 
   LoadingSpinner, 
   LoadingDots, 

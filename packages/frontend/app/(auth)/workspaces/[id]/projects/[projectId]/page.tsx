@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Button, useToast } from '@/components/ui';
+import { Button, useToast, PageLoader } from '@/components/ui';
 import { KanbanBoard, type Issue, type IssueStatus } from '@/components/kanban';
 import { IssuePreviewPanel, IssueCalendarView } from '@/components/issue';
 import { getProjectKey } from '@/lib/issue-key';
@@ -197,11 +197,8 @@ export default function ProjectPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
-          <p className="text-sm text-slate-500">Loading project...</p>
-        </div>
+      <div className="flex-1 flex items-center justify-center">
+        <PageLoader text="Loading project..." />
       </div>
     );
   }

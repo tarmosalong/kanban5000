@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, useToast, Spinner } from '@/components/ui';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button, useToast, LoadingSpinner } from '@/components/ui';
 import { api } from '@/lib/api';
 import { IssuePreviewPanel } from '@/components/issue';
 import { getProjectKey } from '@/lib/issue-key';
@@ -19,8 +19,10 @@ export default function MyIssuesPage() {
 
   async function fetchIssues() {
     try {
-      const data = await api.issues.my();
-      setIssues(data);
+      const response = await fetch('/api/issues/my');
+      if (!response.ok) throw new Error('Failed to load issues');
+      const { data } = await response.json();
+      setIssues(data || []);
     } catch (err) {
       addToast('Failed to load your issues', 'error');
     } finally {
@@ -38,7 +40,7 @@ export default function MyIssuesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Spinner className="w-8 h-8" />
+        <LoadingSpinner className="w-8 h-8" />
       </div>
     );
   }

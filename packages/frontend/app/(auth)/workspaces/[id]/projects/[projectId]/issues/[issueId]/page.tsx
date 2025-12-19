@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Button, Card, Markdown, useToast } from '@/components/ui';
+import { Button, Card, Markdown, useToast, PageLoader } from '@/components/ui';
 import { getProjectKey } from '@/lib/issue-key';
 
 interface Label {
@@ -357,8 +357,8 @@ export default function IssuePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-10 h-10 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+      <div className="flex-1 flex items-center justify-center">
+        <PageLoader text="Loading issue..." />
       </div>
     );
   }

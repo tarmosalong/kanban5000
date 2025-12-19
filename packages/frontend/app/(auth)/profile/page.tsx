@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, useToast } from '@/components/ui';
+import { Button, Input, Card, CardHeader, CardTitle, CardDescription, CardContent, useToast, LoadingSpinner } from '@/components/ui';
 import { api } from '@/lib/api';
 
 export default function ProfilePage() {
@@ -18,7 +18,9 @@ export default function ProfilePage() {
 
   async function fetchProfile() {
     try {
-      const data = await api.auth.me();
+      const response = await fetch('/api/auth/me');
+      if (!response.ok) throw new Error('Failed to load profile');
+      const { data } = await response.json();
       setUser(data);
       setName(data.name || '');
       setImage(data.image || '');
@@ -33,7 +35,14 @@ export default function ProfilePage() {
     e.preventDefault();
     setSaving(true);
     try {
-      await api.auth.updateProfile({ name, image: image || null });
+      const response = await fetch('/api/auth/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, image: image || null }),
+      });
+      
+      if (!response.ok) throw new Error('Failed to update profile');
+      
       addToast('Profile updated successfully', 'success');
       // Update local state or trigger a reload if needed
       if (user) {
@@ -51,7 +60,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" />
+        <LoadingSpinner className="w-8 h-8" />
       </div>
     );
   }
