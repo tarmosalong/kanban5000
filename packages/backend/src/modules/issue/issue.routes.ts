@@ -322,6 +322,30 @@ export function createIssueRoutes(controller: IssueController): RouteDefinition[
         operationId: 'getIssueHistory',
       })
       .handler((req) => controller.getHistory(req)),
+
+    route
+      .get('/projects/:projectId/activity')
+      .params(ProjectIdParamsSchema)
+      .response(z.array(IssueHistorySchema.extend({
+        issue: z.object({
+          id: z.string().uuid(),
+          title: z.string(),
+          number: z.number(),
+        }).optional(),
+        user: z.object({
+          id: z.string().uuid(),
+          name: z.string().nullable(),
+          email: z.string(),
+        }).optional(),
+      })))
+      .use(requireAuth())
+      .meta({
+        summary: 'Get project activity',
+        description: 'Get the recent activity/audit log for all issues in a project',
+        tags: ['Projects'],
+        operationId: 'getProjectActivity',
+      })
+      .handler((req) => controller.getProjectActivity(req)),
   ];
 }
 

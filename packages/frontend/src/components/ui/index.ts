@@ -22,3 +22,5 @@ export {
   CardSkeleton, 
   KanbanSkeleton 
 } from './loading';
+
+export { ProgressRing } from './progress-ring';

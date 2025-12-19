@@ -178,6 +178,20 @@ export class IssueController {
   }
 
   /**
+   * GET /projects/:projectId/activity
+   */
+  async getProjectActivity(
+    req: AppRequest<unknown, { projectId: string }>
+  ): Promise<HandlerResult<IssueHistoryEntry[]>> {
+    this.requireUser(req);
+    const activity = await this.issueService.getProjectHistory(
+      req.user!.id,
+      req.params.projectId
+    );
+    return { data: activity };
+  }
+
+  /**
    * GET /projects/:projectId/issues/search
    */
   async search(

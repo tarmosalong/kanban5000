@@ -9,6 +9,8 @@ export interface Project {
   description: string | null;
   color: string;
   isArchived: boolean;
+  totalIssues?: number;
+  closedIssues?: number;
   settings: ProjectSettings;
   createdBy: string;
   createdAt: Date;

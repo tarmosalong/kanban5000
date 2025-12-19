@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { auth } from '@/lib/auth';
-import { Button } from '@/components/ui';
+import { Button, ProgressRing } from '@/components/ui';
 
 import { DeleteWorkspaceButton } from './delete-button';
 
@@ -15,6 +15,8 @@ interface Project {
   description: string | null;
   color: string;
   isArchived: boolean;
+  totalIssues?: number;
+  closedIssues?: number;
 }
 
 interface Workspace {
@@ -139,12 +141,14 @@ export default async function WorkspaceDetailPage({ params }: Props) {
               >
                 <div className="flex items-start gap-3">
                   <div
-                    className="w-10 h-10 rounded-lg flex-shrink-0 shadow-lg"
+                    className="w-10 h-10 rounded-lg flex-shrink-0 shadow-lg flex items-center justify-center text-xs font-bold text-white"
                     style={{ 
                       backgroundColor: project.color,
                       boxShadow: `0 4px 12px ${project.color}30`
                     }}
-                  />
+                  >
+                    {project.name.substring(0, 2).toUpperCase()}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-white group-hover:text-primary-400 transition-colors truncate">
                       {project.name}
@@ -152,15 +156,35 @@ export default async function WorkspaceDetailPage({ params }: Props) {
                     <p className="text-sm text-slate-500 truncate">
                       /{project.slug}
                     </p>
-                    {project.description && (
-                      <p className="mt-2 text-sm text-slate-400 line-clamp-2">
-                        {project.description}
-                      </p>
-                    )}
                   </div>
+                  
+                  {project.totalIssues && project.totalIssues > 0 ? (
+                    <ProgressRing 
+                      total={project.totalIssues} 
+                      completed={project.closedIssues || 0} 
+                      size={24}
+                      strokeWidth={2.5}
+                      color={project.color}
+                    />
+                  ) : null}
                 </div>
+                {project.description && (
+                  <p className="mt-3 text-sm text-slate-400 line-clamp-2">
+                    {project.description}
+                  </p>
+                )}
                 <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-between">
-                  <span className="text-xs text-slate-500">View board →</span>
+                  <span className="text-xs text-slate-500">
+                    {project.totalIssues && project.totalIssues > 0 
+                      ? `${project.closedIssues}/${project.totalIssues} completed`
+                      : 'No issues yet'}
+                  </span>
+                  <span className="text-xs text-slate-500 group-hover:text-white transition-colors flex items-center gap-1">
+                    View board
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
                 </div>
               </Link>
             ))}

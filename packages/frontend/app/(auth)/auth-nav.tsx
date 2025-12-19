@@ -17,6 +17,10 @@ export function AuthNav({ user, signOutAction }: AuthNavProps) {
   const pathname = usePathname();
   const isInProject = pathname.match(/\/workspaces\/[^\/]+\/projects\/[^\/]+/);
 
+  const openCommandPalette = () => {
+    window.dispatchEvent(new CustomEvent('open-command-palette'));
+  };
+
   return (
     <nav className="nav-bar sticky top-0 z-50">
       <div className="h-full max-w-[1800px] mx-auto px-4 sm:px-6 flex items-center justify-between">
@@ -52,12 +56,21 @@ export function AuthNav({ user, signOutAction }: AuthNavProps) {
           </div>
         </div>
 
-        {/* Center - Search (only visible in project context) */}
-        {isInProject && (
-          <div className="hidden md:block">
-            <SearchBox />
-          </div>
-        )}
+        {/* Center - Search & Command Palette */}
+        <div className="hidden md:flex items-center gap-2">
+          {isInProject && <SearchBox />}
+          <button
+            onClick={openCommandPalette}
+            className="p-1.5 text-slate-500 hover:text-white hover:bg-white/5 rounded-lg transition-colors flex items-center gap-2"
+            title="Command Palette (⌘K)"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {!isInProject && <span className="text-xs font-medium">Search...</span>}
+            <kbd className="hidden lg:inline-block px-1.5 py-0.5 rounded border border-white/[0.08] bg-white/[0.04] text-zinc-500 text-[10px] font-mono leading-none">⌘K</kbd>
+          </button>
+        </div>
 
         {/* Right */}
         <div className="flex items-center gap-3">

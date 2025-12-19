@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { Button, useToast, PageLoader } from '@/components/ui';
 import { KanbanBoard, type Issue, type IssueStatus } from '@/components/kanban';
 import { IssuePreviewPanel, IssueCalendarView } from '@/components/issue';
+import { ActivityFeedSidebar } from '@/components/project/activity-feed-sidebar';
 import { getProjectKey } from '@/lib/issue-key';
 
 interface Project {
@@ -64,6 +65,9 @@ export default function ProjectPage() {
   
   // Selected issue for preview panel
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+
+  // Activity Feed state
+  const [showActivityFeed, setShowActivityFeed] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -332,6 +336,20 @@ export default function ProjectPage() {
               </svg>
             </Link>
 
+            <button
+              onClick={() => setShowActivityFeed(true)}
+              className={`p-2 rounded-lg transition-colors ${
+                showActivityFeed
+                  ? 'bg-primary-500/20 text-primary-400'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+              title="Recent Activity"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </button>
+
             <Link
               href={`/workspaces/${workspaceId}/projects/${projectId}/settings`}
               className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
@@ -560,6 +578,13 @@ export default function ProjectPage() {
         projectId={projectId}
         projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
         onClose={() => setSelectedIssue(null)}
+      />
+
+      <ActivityFeedSidebar
+        projectId={projectId}
+        projectSlug={project?.slug || ''}
+        isOpen={showActivityFeed}
+        onClose={() => setShowActivityFeed(false)}
       />
     </div>
   );

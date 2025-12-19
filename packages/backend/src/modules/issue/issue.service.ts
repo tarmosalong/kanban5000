@@ -34,6 +34,7 @@ export interface IIssueService {
   
   // History
   getHistory(userId: string, issueId: string): Promise<IssueHistoryEntry[]>;
+  getProjectHistory(userId: string, projectId: string): Promise<IssueHistoryEntry[]>;
   
   // Search
   search(userId: string, projectId: string, query: string): Promise<Issue[]>;
@@ -170,6 +171,11 @@ export class IssueService implements IIssueService {
 
     await this.requireProjectAccess(userId, issue.projectId);
     return this.issueRepository.getHistory(issueId);
+  }
+
+  async getProjectHistory(userId: string, projectId: string): Promise<IssueHistoryEntry[]> {
+    await this.requireProjectAccess(userId, projectId);
+    return this.issueRepository.getProjectHistory(projectId);
   }
 
   // Search

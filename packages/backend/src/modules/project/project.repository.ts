@@ -83,19 +83,35 @@ export class ProjectRepository implements IProjectRepository {
   async findByWorkspaceId(workspaceId: string, filters?: ProjectFilters): Promise<Project[]> {
     let query = this.db
       .selectFrom('projects')
-      .selectAll()
-      .where('workspace_id', '=', workspaceId)
-      .orderBy('created_at', 'desc');
+      .leftJoin('issues', 'issues.project_id', 'projects.id')
+      .select([
+        'projects.id',
+        'projects.workspace_id',
+        'projects.name',
+        'projects.slug',
+        'projects.description',
+        'projects.color',
+        'projects.is_archived',
+        'projects.settings',
+        'projects.created_by',
+        'projects.created_at',
+        'projects.updated_at',
+        (({ fn }) => fn.count('issues.id').as('total_issues')),
+        (({ fn }) => fn.count('issues.id').filterWhere('issues.closed_at', 'is not', null).as('closed_issues')),
+      ])
+      .where('projects.workspace_id', '=', workspaceId)
+      .groupBy('projects.id')
+      .orderBy('projects.created_at', 'desc');
 
     if (!filters?.includeArchived) {
-      query = query.where('is_archived', '=', false);
+      query = query.where('projects.is_archived', '=', false);
     }
 
     if (filters?.search) {
       query = query.where((eb) =>
         eb.or([
-          eb('name', 'ilike', `%${filters.search}%`),
-          eb('description', 'ilike', `%${filters.search}%`),
+          eb('projects.name', 'ilike', `%${filters.search}%`),
+          eb('projects.description', 'ilike', `%${filters.search}%`),
         ])
       );
     }
@@ -109,7 +125,7 @@ export class ProjectRepository implements IProjectRepository {
     }
 
     const rows = await query.execute();
-    return rows.map((row) => this.toProjectDomain(row));
+    return rows.map((row) => this.toProjectDomain(row as any));
   }
 
   async create(workspaceId: string, userId: string, input: CreateProjectInput): Promise<Project> {
@@ -489,6 +505,8 @@ export class ProjectRepository implements IProjectRepository {
     created_by: string;
     created_at: Date;
     updated_at: Date;
+    total_issues?: string | number;
+    closed_issues?: string | number;
   }): Project {
     return {
       id: row.id,
@@ -498,6 +516,8 @@ export class ProjectRepository implements IProjectRepository {
       description: row.description,
       color: row.color,
       isArchived: row.is_archived,
+      totalIssues: row.total_issues !== undefined ? Number(row.total_issues) : undefined,
+      closedIssues: row.closed_issues !== undefined ? Number(row.closed_issues) : undefined,
       settings: (typeof row.settings === 'string'
         ? JSON.parse(row.settings)
         : row.settings) as ProjectSettings,

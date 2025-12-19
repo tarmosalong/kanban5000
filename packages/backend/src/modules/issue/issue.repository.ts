@@ -37,6 +37,7 @@ export interface IIssueRepository {
   
   // History
   getHistory(issueId: string): Promise<IssueHistoryEntry[]>;
+  getProjectHistory(projectId: string, limit?: number): Promise<IssueHistoryEntry[]>;
   
   // Search
   searchIssues(projectId: string, query: string, limit?: number): Promise<Issue[]>;
@@ -476,6 +477,52 @@ export class IssueRepository implements IIssueRepository {
         email: row.user_email,
       },
     }));
+  }
+
+  async getProjectHistory(projectId: string, limit = 50): Promise<IssueHistoryEntry[]> {
+    const rows = await this.db
+      .selectFrom('issue_history')
+      .innerJoin('issues', 'issues.id', 'issue_history.issue_id')
+      .innerJoin('users', 'users.id', 'issue_history.user_id')
+      .select([
+        'issue_history.id',
+        'issue_history.issue_id',
+        'issue_history.user_id',
+        'issue_history.action',
+        'issue_history.field_name',
+        'issue_history.old_value',
+        'issue_history.new_value',
+        'issue_history.created_at',
+        'users.name as user_name',
+        'users.email as user_email',
+        'issues.title as issue_title',
+        'issues.number as issue_number',
+      ])
+      .where('issues.project_id', '=', projectId)
+      .orderBy('issue_history.created_at', 'desc')
+      .limit(limit)
+      .execute();
+
+    return rows.map((row) => ({
+      id: row.id,
+      issueId: row.issue_id,
+      userId: row.user_id,
+      action: row.action,
+      fieldName: row.field_name,
+      oldValue: row.old_value,
+      newValue: row.new_value,
+      createdAt: row.created_at,
+      user: {
+        id: row.user_id,
+        name: row.user_name,
+        email: row.user_email,
+      },
+      issue: {
+        id: row.issue_id,
+        title: row.issue_title,
+        number: row.issue_number,
+      },
+    } as any));
   }
 
   // Search
