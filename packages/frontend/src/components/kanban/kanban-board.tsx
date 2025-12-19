@@ -4,10 +4,11 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
+  useDroppable,
 } from '@dnd-kit/core';
 
 import { IssueCard } from './issue-card';
@@ -39,6 +40,26 @@ function PlaceholderCard({ issue, projectKey }: { issue: Issue; projectKey: stri
         <div className="h-3 w-3/4 bg-white/20 rounded" />
         <div className="h-3 w-1/2 bg-white/20 rounded" />
       </div>
+    </div>
+  );
+}
+
+// Empty column area component
+function EmptyColumnArea({ columnId, isDragging }: { columnId: string; isDragging: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `empty:${columnId}` });
+
+  if (isDragging && !isOver) return null;
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`flex items-center justify-center h-24 text-[12px] rounded-lg border-2 border-dashed transition-colors ${
+        isOver
+          ? 'bg-accent-500/10 border-accent-500/40 text-accent-400'
+          : 'bg-transparent border-white/[0.04] text-zinc-700'
+      }`}
+    >
+      {isOver ? 'Drop here' : 'Drop issues here'}
     </div>
   );
 }
@@ -146,7 +167,7 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
@@ -190,10 +211,8 @@ export function KanbanBoard({
               <DroppableColumn columnId={column.id} issueCount={column.issues.length}>
                 {renderIssuesInColumn(column)}
 
-                {column.issues.length === 0 && !dragState.activeId && (
-                  <div className="flex items-center justify-center h-20 text-[12px] text-zinc-700 border border-dashed border-white/[0.06] rounded-lg">
-                    Drop issues here
-                  </div>
+                {column.issues.length === 0 && (
+                  <EmptyColumnArea columnId={column.id} isDragging={!!dragState.activeId} />
                 )}
               </DroppableColumn>
             </div>

@@ -72,17 +72,20 @@ export function useKanbanDrag(
       let targetColumnId: string;
       let targetIndex: number;
 
+    if (overId.startsWith('bottom:') || overId.startsWith('column:') || overId.startsWith('empty:')) {
       if (overId.startsWith('bottom:')) {
         const parts = overId.split(':');
         targetColumnId = parts[1];
         targetIndex = parseInt(parts[2], 10);
       } else if (overId.startsWith('column:')) {
         targetColumnId = overId.replace('column:', '');
-        const columnIssues = localIssues
-          .filter(i => i.status.id === targetColumnId)
-          .sort((a, b) => a.position - b.position);
-        targetIndex = columnIssues.length;
+        const col = columns.find(c => c.id === targetColumnId);
+        targetIndex = col ? col.issues.length : 0;
       } else {
+        targetColumnId = overId.replace('empty:', '');
+        targetIndex = 0;
+      }
+    } else {
         const columnId = getColumnId(overId);
         if (!columnId) return prev;
         targetColumnId = columnId;
