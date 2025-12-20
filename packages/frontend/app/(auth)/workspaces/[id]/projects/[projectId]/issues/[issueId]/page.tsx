@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Button, Card, Markdown, useToast, PageLoader } from '@/components/ui';
 import { getProjectKey } from '@/lib/issue-key';
 
@@ -97,6 +98,7 @@ const PRIORITY_OPTIONS = [
 
 export default function IssuePage() {
   const params = useParams();
+  const { data: session } = useSession();
   const workspaceId = params.id as string;
   const projectId = params.projectId as string;
   const issueId = params.issueId as string;
@@ -802,12 +804,22 @@ export default function IssuePage() {
           <Card className="p-4 bg-surface-card border-white/[0.06]">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Assignee</h3>
-              <button
-                onClick={() => setShowAssigneePicker(!showAssigneePicker)}
-                className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
-              >
-                {showAssigneePicker ? 'Done' : 'Edit'}
-              </button>
+              <div className="flex items-center gap-2">
+                {!showAssigneePicker && issue.assignee?.id !== session?.backendUserId && (
+                  <button
+                    onClick={() => handleAssigneeChange(session?.backendUserId || null)}
+                    className="text-xs text-accent-400 hover:text-accent-300 transition-colors"
+                  >
+                    Assign to me
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowAssigneePicker(!showAssigneePicker)}
+                  className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                >
+                  {showAssigneePicker ? 'Done' : 'Edit'}
+                </button>
+              </div>
             </div>
             
             {showAssigneePicker ? (

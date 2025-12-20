@@ -51,6 +51,13 @@ const IssueWithDetailsSchema = IssueSchema.extend({
     name: z.string(),
     color: z.string(),
   })),
+  project: z.object({
+    id: z.string().uuid(),
+    name: z.string(),
+    slug: z.string(),
+    workspaceId: z.string().uuid(),
+  }).optional(),
+  relations: z.array(z.any()).optional(),
 });
 
 const CreateIssueSchema = z.object({

@@ -84,6 +84,7 @@ export class ProjectRepository implements IProjectRepository {
     let query = this.db
       .selectFrom('projects')
       .leftJoin('issues', 'issues.project_id', 'projects.id')
+      .leftJoin('issue_statuses', 'issue_statuses.id', 'issues.status_id')
       .select([
         'projects.id',
         'projects.workspace_id',
@@ -97,7 +98,7 @@ export class ProjectRepository implements IProjectRepository {
         'projects.created_at',
         'projects.updated_at',
         (({ fn }) => fn.count('issues.id').as('total_issues')),
-        (({ fn }) => fn.count('issues.id').filterWhere('issues.closed_at', 'is not', null).as('closed_issues')),
+        (({ fn }) => fn.count('issues.id').filterWhere('issue_statuses.is_closed', '=', true).as('closed_issues')),
       ])
       .where('projects.workspace_id', '=', workspaceId)
       .groupBy('projects.id')
@@ -317,9 +318,10 @@ export class ProjectRepository implements IProjectRepository {
 
     const closedResult = await this.db
       .selectFrom('issues')
-      .where('project_id', '=', projectId)
-      .where('closed_at', 'is not', null)
-      .select(({ fn }) => fn.count('id').as('count'))
+      .innerJoin('issue_statuses', 'issue_statuses.id', 'issues.status_id')
+      .where('issues.project_id', '=', projectId)
+      .where('issue_statuses.is_closed', '=', true)
+      .select(({ fn }) => fn.count('issues.id').as('count'))
       .executeTakeFirst();
 
     const totalIssues = Number(totalResult?.count ?? 0);

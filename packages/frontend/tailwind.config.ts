@@ -71,11 +71,12 @@ const config: Config = {
         normal: '0',
       },
       borderRadius: {
-        DEFAULT: '8px',
-        sm: '6px',
-        md: '8px',
-        lg: '12px',
-        xl: '16px',
+        DEFAULT: 'var(--radius-md)',
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+        '2xl': 'calc(var(--radius-xl) * 1.5)',
       },
       boxShadow: {
         'xs': '0 1px 2px rgba(0, 0, 0, 0.06)',

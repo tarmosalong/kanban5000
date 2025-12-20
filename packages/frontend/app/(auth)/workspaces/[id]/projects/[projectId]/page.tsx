@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button, useToast, PageLoader } from '@/components/ui';
 import { KanbanBoard, type Issue, type IssueStatus } from '@/components/kanban';
 import { IssuePreviewPanel, IssueCalendarView } from '@/components/issue';
-import { ActivityFeedSidebar } from '@/components/project/activity-feed-sidebar';
+import { ActivityFeedSidebar, ProjectStatsPanel } from '@/components/project';
 import { getProjectKey } from '@/lib/issue-key';
 
 interface Project {
@@ -29,7 +29,16 @@ interface Filters {
   assigneeId: string | null;
   labelId: string | null;
   statusId: string | null;
+  sortKey: 'number' | 'title' | 'status' | 'priority' | 'assignee' | 'dueDate' | 'createdAt';
+  sortOrder: 'asc' | 'desc';
 }
+
+const PRIORITY_ORDER = {
+  urgent: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+};
 
 const PRIORITY_OPTIONS = [
   { value: 'urgent', label: 'Urgent', color: '#ef4444' },
@@ -40,9 +49,12 @@ const PRIORITY_OPTIONS = [
 
 export default function ProjectPage() {
   const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { addToast } = useToast();
   const workspaceId = params.id as string;
   const projectId = params.projectId as string;
+  const issueIdFromUrl = searchParams.get('issue');
 
   const [project, setProject] = useState<Project | null>(null);
   const [statuses, setStatuses] = useState<IssueStatus[]>([]);
@@ -57,8 +69,9 @@ export default function ProjectPage() {
     assigneeId: null,
     labelId: null,
     statusId: null,
+    sortKey: 'number',
+    sortOrder: 'asc',
   });
-  const [showFilters, setShowFilters] = useState(false);
   
   // View mode
   const [viewMode, setViewMode] = useState<'board' | 'list' | 'calendar'>('board');
@@ -66,8 +79,35 @@ export default function ProjectPage() {
   // Selected issue for preview panel
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
 
+  // Sync selected issue with URL
+  useEffect(() => {
+    if (issueIdFromUrl && issues.length > 0) {
+      const issue = issues.find(i => i.id === issueIdFromUrl);
+      if (issue) {
+        setSelectedIssue(issue);
+      }
+    }
+  }, [issueIdFromUrl, issues]);
+
+  const handleIssueClick = (issue: Issue) => {
+    setSelectedIssue(issue);
+    const newParams = new URLSearchParams(searchParams.toString());
+    newParams.set('issue', issue.id);
+    router.push(`?${newParams.toString()}`, { scroll: false });
+  };
+
+  const handleClosePanel = () => {
+    setSelectedIssue(null);
+    const newParams = new URLSearchParams(searchParams.toString());
+    newParams.delete('issue');
+    router.push(`?${newParams.toString()}`, { scroll: false });
+  };
+
   // Activity Feed state
   const [showActivityFeed, setShowActivityFeed] = useState(false);
+  
+  // Stats panel state
+  const [showStats, setShowStats] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -167,9 +207,9 @@ export default function ProjectPage() {
     return Array.from(uniqueAssignees.values());
   }, [issues]);
 
-  // Filter issues
+  // Filter and Sort issues
   const filteredIssues = useMemo(() => {
-    return issues.filter((issue) => {
+    const filtered = issues.filter((issue) => {
       if (filters.priority && issue.priority !== filters.priority) {
         return false;
       }
@@ -190,13 +230,56 @@ export default function ProjectPage() {
       }
       return true;
     });
+
+    return filtered.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (filters.sortKey) {
+        case 'number':
+          comparison = a.number - b.number;
+          break;
+        case 'title':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'status':
+          comparison = a.status.name.localeCompare(b.status.name);
+          break;
+        case 'priority':
+          comparison = (PRIORITY_ORDER[a.priority as keyof typeof PRIORITY_ORDER] || 0) - 
+                       (PRIORITY_ORDER[b.priority as keyof typeof PRIORITY_ORDER] || 0);
+          break;
+        case 'assignee':
+          const nameA = a.assignee?.name || a.assignee?.email || 'zzz';
+          const nameB = b.assignee?.name || b.assignee?.email || 'zzz';
+          comparison = nameA.localeCompare(nameB);
+          break;
+        case 'dueDate':
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          comparison = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+          break;
+        case 'createdAt':
+          comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+          break;
+      }
+
+      return filters.sortOrder === 'asc' ? comparison : -comparison;
+    });
   }, [issues, filters]);
 
   // Check if any filters are active
   const hasActiveFilters = filters.priority || filters.assigneeId || filters.labelId || filters.statusId;
 
   const clearFilters = () => {
-    setFilters({ priority: null, assigneeId: null, labelId: null, statusId: null });
+    setFilters({ priority: null, assigneeId: null, labelId: null, statusId: null, sortKey: 'number', sortOrder: 'asc' });
+  };
+
+  const handleSort = (key: Filters['sortKey']) => {
+    setFilters(prev => ({
+      ...prev,
+      sortKey: key,
+      sortOrder: prev.sortKey === key && prev.sortOrder === 'asc' ? 'desc' : 'asc',
+    }));
   };
 
   if (loading) {
@@ -308,33 +391,19 @@ export default function ProjectPage() {
               </button>
             </div>
 
-            {/* Filter toggle button */}
             <button
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={() => setShowStats(true)}
               className={`p-2 rounded-lg transition-colors ${
-                showFilters || hasActiveFilters
+                showStats
                   ? 'bg-primary-500/20 text-primary-400'
                   : 'text-slate-400 hover:text-white hover:bg-white/5'
               }`}
-              title="Filters"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-              </svg>
-              {hasActiveFilters && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary-500 rounded-full" />
-              )}
-            </button>
-
-            <Link
-              href={`/workspaces/${workspaceId}/projects/${projectId}/dashboard`}
-              className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-              title="Dashboard"
+              title="Project Statistics"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
-            </Link>
+            </button>
 
             <button
               onClick={() => setShowActivityFeed(true)}
@@ -373,9 +442,8 @@ export default function ProjectPage() {
       </div>
 
       {/* Filter bar */}
-      {showFilters && (
-        <div className="flex-shrink-0 px-6 py-3 border-b border-white/[0.06] bg-white/[0.02]">
-          <div className="flex items-center gap-4 flex-wrap">
+      <div className="flex-shrink-0 px-6 py-3 border-b border-white/[0.06] bg-white/[0.02]">
+        <div className="flex items-center gap-4 flex-wrap">
             {/* Priority filter */}
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 uppercase tracking-wider">Priority</span>
@@ -501,7 +569,6 @@ export default function ProjectPage() {
             )}
           </div>
         </div>
-      )}
 
       {/* Content - fills remaining space */}
       <div className="flex-1 overflow-hidden p-4">
@@ -546,7 +613,7 @@ export default function ProjectPage() {
                 projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
                 onIssueMove={handleIssueMove}
                 onQuickCreate={handleQuickCreate}
-                onIssueClick={setSelectedIssue}
+                onIssueClick={handleIssueClick}
               />
             </div>
           </div>
@@ -557,7 +624,10 @@ export default function ProjectPage() {
             workspaceId={workspaceId}
             projectId={projectId}
             projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
-            onIssueClick={setSelectedIssue}
+            onIssueClick={handleIssueClick}
+            sortKey={filters.sortKey}
+            sortOrder={filters.sortOrder}
+            onSort={handleSort}
           />
         ) : (
           <IssueCalendarView
@@ -566,25 +636,33 @@ export default function ProjectPage() {
             workspaceId={workspaceId}
             projectId={projectId}
             projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
-            onIssueClick={setSelectedIssue}
+            onIssueClick={handleIssueClick}
           />
         )}
       </div>
 
       {/* Issue Preview Panel */}
-      <IssuePreviewPanel
-        issue={selectedIssue}
-        workspaceId={workspaceId}
-        projectId={projectId}
-        projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
-        onClose={() => setSelectedIssue(null)}
-      />
+           <IssuePreviewPanel
+             issue={selectedIssue}
+             workspaceId={workspaceId}
+             projectId={projectId}
+             projectKey={project ? getProjectKey(project.slug) : 'PROJ'}
+             onClose={handleClosePanel}
+             onUpdate={fetchData}
+           />
 
       <ActivityFeedSidebar
         projectId={projectId}
         projectSlug={project?.slug || ''}
         isOpen={showActivityFeed}
         onClose={() => setShowActivityFeed(false)}
+      />
+
+      <ProjectStatsPanel
+        projectId={projectId}
+        projectName={project?.name || ''}
+        isOpen={showStats}
+        onClose={() => setShowStats(false)}
       />
     </div>
   );
@@ -598,6 +676,9 @@ function IssueListView({
   projectId,
   projectKey,
   onIssueClick,
+  sortKey,
+  sortOrder,
+  onSort,
 }: { 
   issues: Issue[]; 
   statuses: IssueStatus[];
@@ -605,6 +686,9 @@ function IssueListView({
   projectId: string;
   projectKey: string;
   onIssueClick?: (issue: Issue) => void;
+  sortKey: Filters['sortKey'];
+  sortOrder: Filters['sortOrder'];
+  onSort: (key: Filters['sortKey']) => void;
 }) {
   const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
     low: { bg: 'bg-slate-500/10', text: 'text-slate-400' },
@@ -613,18 +697,81 @@ function IssueListView({
     urgent: { bg: 'bg-red-500/10', text: 'text-red-400' },
   };
 
+  const SortIcon = ({ column }: { column: Filters['sortKey'] }) => {
+    if (sortKey !== column) return <div className="w-3 h-3 ml-1 opacity-0 group-hover:opacity-30" />;
+    return (
+      <svg 
+        className={`w-3 h-3 ml-1 transition-transform ${sortOrder === 'desc' ? 'rotate-180' : ''}`} 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+      </svg>
+    );
+  };
+
   return (
     <div className="h-full overflow-auto">
       <table className="w-full">
-        <thead className="sticky top-0 bg-surface">
+        <thead className="sticky top-0 bg-surface z-10">
           <tr className="border-b border-white/[0.06]">
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-16">#</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider">Title</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-32">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-24">Priority</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-40">Assignee</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-28">Due Date</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-28">Created</th>
+            <th 
+              className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-16 cursor-pointer hover:text-white transition-colors group"
+              onClick={() => onSort('number')}
+            >
+              <div className="flex items-center">
+                # <SortIcon column="number" />
+              </div>
+            </th>
+            <th 
+              className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors group"
+              onClick={() => onSort('title')}
+            >
+              <div className="flex items-center">
+                Title <SortIcon column="title" />
+              </div>
+            </th>
+            <th 
+              className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-32 cursor-pointer hover:text-white transition-colors group"
+              onClick={() => onSort('status')}
+            >
+              <div className="flex items-center">
+                Status <SortIcon column="status" />
+              </div>
+            </th>
+            <th 
+              className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-24 cursor-pointer hover:text-white transition-colors group"
+              onClick={() => onSort('priority')}
+            >
+              <div className="flex items-center">
+                Priority <SortIcon column="priority" />
+              </div>
+            </th>
+            <th 
+              className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-40 cursor-pointer hover:text-white transition-colors group"
+              onClick={() => onSort('assignee')}
+            >
+              <div className="flex items-center">
+                Assignee <SortIcon column="assignee" />
+              </div>
+            </th>
+            <th 
+              className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-28 cursor-pointer hover:text-white transition-colors group"
+              onClick={() => onSort('dueDate')}
+            >
+              <div className="flex items-center">
+                Due Date <SortIcon column="dueDate" />
+              </div>
+            </th>
+            <th 
+              className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wider w-28 cursor-pointer hover:text-white transition-colors group"
+              onClick={() => onSort('createdAt')}
+            >
+              <div className="flex items-center">
+                Created <SortIcon column="createdAt" />
+              </div>
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-white/[0.04]">

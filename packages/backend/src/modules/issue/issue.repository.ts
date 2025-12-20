@@ -216,7 +216,6 @@ export class IssueRepository implements IIssueRepository {
         'projects.workspace_id as project_workspace_id',
       ])
       .where('issues.assigned_to', '=', assigneeId)
-      .where('issues.closed_at', 'is', null) // Only show open issues by default
       .orderBy('issues.created_at', 'desc')
       .execute();
 
@@ -766,6 +765,7 @@ export class IssueRepository implements IIssueRepository {
         slug: row.project_slug,
         workspaceId: row.project_workspace_id,
       } : undefined,
+      relations: [],
     };
   }
 
@@ -797,13 +797,23 @@ export class IssueRepository implements IIssueRepository {
         .where('position', '>=', newPosition)
         .execute();
 
-      // Update the issue with new status and position
+      // Check if new status is closed
+      const newStatus = await this.db
+        .selectFrom('issue_statuses')
+        .select('is_closed')
+        .where('id', '=', statusId)
+        .executeTakeFirst();
+
+      const closedAt = newStatus?.is_closed ? new Date() : null;
+
+      // Update the issue with new status, position and closed_at
       await this.db
         .updateTable('issues')
         .set({
           status_id: statusId,
           position: newPosition,
           updated_at: new Date(),
+          closed_at: closedAt,
         })
         .where('id', '=', issueId)
         .execute();
