@@ -23,6 +23,13 @@ const PRIORITY_ORDER = {
   low: 1,
 };
 
+const PRIORITY_CONFIG = {
+  low: { color: '#71717a' },
+  medium: { color: '#60a5fa' },
+  high: { color: '#fbbf24' },
+  urgent: { color: '#f87171' },
+};
+
 export default function MyIssuesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -296,10 +303,15 @@ export default function MyIssuesPage() {
                   return (
                     <tr 
                       key={issue.id} 
-                      className="hover:bg-white/[0.02] transition-colors group cursor-pointer"
+                      className="hover:bg-white/[0.02] transition-colors group cursor-pointer relative"
                       onClick={() => handleIssueClick(issue)}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 relative">
+                        {/* Priority vertical indicator */}
+                        <div 
+                          className="absolute left-0 top-0 bottom-0 w-[2px]" 
+                          style={{ backgroundColor: PRIORITY_CONFIG[issue.priority as keyof typeof PRIORITY_CONFIG]?.color || '#6b7280' }}
+                        />
                         <span className="text-zinc-500 font-mono text-[12px]">
                           {issue.project ? getProjectKey(issue.project.slug) : 'ISSUE'}-{issue.number}
                         </span>

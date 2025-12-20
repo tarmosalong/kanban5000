@@ -32,13 +32,13 @@ interface KanbanBoardProps {
 // Placeholder card shown during drag
 function PlaceholderCard({ issue, projectKey }: { issue: Issue; projectKey: string }) {
   return (
-    <div className="w-full rounded-lg border-2 border-dashed border-accent-500/30 bg-accent-500/5 min-h-[100px] p-3 animate-pulse pointer-events-none">
+    <div className="w-full rounded-lg border border-dashed border-accent-500/20 bg-accent-500/5 min-h-[100px] p-3 animate-pulse pointer-events-none">
       <div className="flex items-center justify-between mb-2 opacity-20">
         <span className="text-[11px] font-mono">{projectKey}-{issue.number}</span>
       </div>
       <div className="space-y-2 opacity-10">
-        <div className="h-3 w-3/4 bg-white/20 rounded" />
-        <div className="h-3 w-1/2 bg-white/20 rounded" />
+        <div className="h-3 w-3/4 bg-white/20 rounded-sm" />
+        <div className="h-3 w-1/2 bg-white/20 rounded-sm" />
       </div>
     </div>
   );
@@ -176,19 +176,20 @@ export function KanbanBoard({
       <div className="flex gap-3 h-full">
         {columns.map((column) => {
           const isOverColumn = dragState.overColumnId === column.id;
+          const isInProgress = column.name.toLowerCase().includes('progress') || column.name.toLowerCase().includes('töös');
 
           return (
             <div
               key={column.id}
               className={`flex flex-col flex-shrink-0 w-72 rounded-xl bg-zinc-900/30 border transition-all duration-150 ${
                 isOverColumn ? 'border-accent-500/30 ring-1 ring-accent-500/10' : 'border-white/[0.04]'
-              }`}
+              } ${isInProgress ? 'bg-zinc-900/40 border-white/[0.08] shadow-lg shadow-black/5 ring-1 ring-white/[0.02]' : ''}`}
             >
               {/* Column Header */}
-              <div className="flex items-center gap-2 px-3 py-2.5 border-b border-white/[0.04]">
+              <div className={`flex items-center gap-2 px-3 py-2.5 border-b transition-colors ${isInProgress ? 'border-white/[0.08] bg-white/[0.02]' : 'border-white/[0.04]'}`}>
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: column.color }} />
-                <span className="font-medium text-[13px] text-zinc-300">{column.name}</span>
-                <span className="text-[11px] text-zinc-600 bg-white/[0.04] px-1.5 py-0.5 rounded-md ml-auto">
+                <span className={`font-medium text-[13px] ${isInProgress ? 'text-white' : 'text-zinc-300'}`}>{column.name}</span>
+                <span className={`text-[11px] px-1.5 py-0.5 rounded-md ml-auto ${isInProgress ? 'text-zinc-400 bg-white/[0.06]' : 'text-zinc-600 bg-white/[0.04]'}`}>
                   {column.issues.length}
                 </span>
 

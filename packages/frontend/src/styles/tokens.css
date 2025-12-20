@@ -36,11 +36,11 @@
   --color-error-500: #dc5c6f;
 
   /* Dark theme surfaces - Softer dark with slight blue tint */
-  --color-surface: #0c0d10;
-  --color-surface-elevated: #15171c;
-  --color-surface-overlay: #1e2128;
-  --color-surface-card: rgba(21, 23, 28, 0.7);
-  --color-surface-hover: rgba(255, 255, 255, 0.025);
+  --color-surface: #0a0b0d;
+  --color-surface-elevated: #12141a;
+  --color-surface-overlay: #1a1d24;
+  --color-surface-card: rgba(24, 26, 32, 0.8);
+  --color-surface-hover: rgba(255, 255, 255, 0.03);
   
   /* Borders - Subtle */
   --color-border: rgba(255, 255, 255, 0.07);

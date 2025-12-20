@@ -71,25 +71,42 @@ export function IssueCard({
     <div
       className={`
         group relative overflow-hidden
-        bg-zinc-900/50 backdrop-blur-sm
-        border border-white/[0.04] rounded-lg
-        hover:border-white/[0.08] hover:bg-zinc-900/70
-        transition-all duration-150
+        bg-zinc-800/60 backdrop-blur-md
+        border border-white/[0.08] rounded-lg
+        hover:border-white/[0.15] hover:bg-zinc-800/80
+        transition-all duration-150 shadow-sm
         ${isDragging 
-          ? 'shadow-lg shadow-accent-500/10 border-accent-500/30 scale-[1.02]' 
+          ? 'shadow-xl shadow-accent-500/10 border-accent-500/30 scale-[1.02]' 
           : ''
         }
-        ${dueDateStatus.isOverdue ? 'border-l-2 border-l-red-500/60' : ''}
       `}
     >
+      {/* Priority vertical bar */}
+      <div 
+        className="absolute left-0 top-0 bottom-0 w-[3px]" 
+        style={{ backgroundColor: priority.color }}
+      />
+      
+      {/* Overdue border - now a secondary indicator since we have the priority bar */}
+      {dueDateStatus.isOverdue && (
+        <div className="absolute left-[3px] top-0 bottom-0 w-[1px] bg-red-500/40" />
+      )}
+
       {/* Content */}
-      <div className="p-3">
+      <div className="p-3 pl-4">
         {/* Header: Number & Priority */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-zinc-600 text-[11px] font-mono">
             {projectKey}-{issue.number}
           </span>
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${priority.bg} ${priority.text}`}>
+          <span 
+            className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded opacity-60 group-hover:opacity-100 transition-opacity"
+            style={{ 
+              backgroundColor: `${priority.color}15`, 
+              color: priority.color,
+              border: `1px solid ${priority.color}25`
+            }}
+          >
             {priority.label}
           </span>
         </div>

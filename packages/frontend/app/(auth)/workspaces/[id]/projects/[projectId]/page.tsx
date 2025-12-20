@@ -782,9 +782,14 @@ function IssueListView({
             return (
               <tr 
                 key={issue.id} 
-                className="hover:bg-white/[0.02] transition-colors group"
+                className="hover:bg-white/[0.02] transition-colors group relative"
               >
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 relative">
+                  {/* Priority vertical indicator for list view */}
+                  <div 
+                    className="absolute left-0 top-0 bottom-0 w-[2px]" 
+                    style={{ backgroundColor: PRIORITY_OPTIONS.find(p => p.value === issue.priority)?.color }}
+                  />
                   <span className="text-slate-500 font-mono text-sm">{projectKey}-{issue.number}</span>
                 </td>
                 <td className="px-4 py-3">
